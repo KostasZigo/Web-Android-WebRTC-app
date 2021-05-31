@@ -1,0 +1,23 @@
+{
+  "name": "roulette-backend",
+  "version": "1.0.0",
+  "main": "src/index.ts",
+  "author": "Rafael Viscarra",
+  "license": "MIT",
+  "private": false,
+  "scripts": {
+    "start": "nodemon --watch src --exec ts-node src/index.ts"
+  },
+  "devDependencies": {
+    "@types/uuid": "^8.3.0",
+    "@types/ws": "^7.4.1",
+    "nodemon": "^2.0.7",
+    "ts-node": "^9.1.1",
+    "typescript": "^4.2.4"
+  },
+  "dependencies": {
+    "uuid": "^8.3.2",
+    "uuidv4": "^6.2.7",
+    "ws": "^7.4.5"
+  }
+}

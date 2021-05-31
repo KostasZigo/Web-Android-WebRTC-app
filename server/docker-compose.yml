@@ -1,0 +1,16 @@
+version: "3.9"  # optional since v1.27.0
+services:
+  server:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/server
+    image: kostas/node-server
+  web:
+    build: . 
+    ports:
+      - "3000:80"
+    volumes:
+        - .:/webTerra
+    image: kostas/web

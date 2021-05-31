@@ -1,0 +1,3 @@
+C:\Users\Guest2\AppData\Roaming\npm
+docker run -p 8000:8000 kostas/node-server
+docker run -p 3000:80 --rm kostas/web
