@@ -43,15 +43,15 @@ You have to change the BACKEND_URL at VideoCallActivity.kt of Android applicatio
 ## Usage
 
 #### Android Usage
- 1. Run the Android app and press the CONNECT button.
+ 1. Run the Android app and press the ***CONNECT*** button.
  2. You will connect to the first available user and communication will be started.
  3. You can press the red button to hang up at any time.
 
 #### Web Usage
  1. Enter localhost:4200 from your browser to connect to the application.
- 2. In order to open your camera press the Start button and to close it press the Stop button.
- 3. Press the Call button to start the communication with the first available user.
- 4. Press the Hangup button to stop the communication.
+ 2. In order to open your camera press the ***Start*** button and to close it press the ***Stop*** button.
+ 3. Press the ***Call*** button to start the communication with the first available user.
+ 4. Press the ***Hangup*** button to stop the communication.
 
 ## Reference
 
