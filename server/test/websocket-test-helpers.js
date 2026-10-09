@@ -22,6 +22,7 @@ async function connectClient(t, url) {
   const socket = new WebSocket(url);
   const messages = [];
   const pending = [];
+  let closeCode;
 
   socket.on('message', raw => {
     const next = pending.shift();
@@ -31,7 +32,8 @@ async function connectClient(t, url) {
       messages.push(raw.toString());
     }
   });
-  socket.on('close', () => {
+  socket.on('close', code => {
+    closeCode = code;
     for (const next of pending.splice(0)) {
       next.reject(new Error('Connection closed before a message arrived'));
     }
@@ -49,7 +51,10 @@ async function connectClient(t, url) {
     send(message) {
       socket.send(JSON.stringify(message));
     },
-    async receive() {
+    sendRaw(message) {
+      socket.send(message);
+    },
+    async receive(timeoutMs = 2000) {
       if (messages.length) {
         return JSON.parse(messages.shift());
       }
@@ -68,10 +73,16 @@ async function connectClient(t, url) {
         const timeout = setTimeout(() => {
           pending.splice(pending.indexOf(next), 1);
           reject(new Error('Timed out waiting for a signaling message'));
-        }, 2000);
+        }, timeoutMs);
         pending.push(next);
       });
       return JSON.parse(raw);
+    },
+    async closed() {
+      if (closeCode === undefined) {
+        await once(socket, 'close');
+      }
+      return closeCode;
     },
     async close() {
       if (socket.readyState === WebSocket.OPEN) {
