@@ -6,7 +6,8 @@
   "license": "MIT",
   "private": false,
   "scripts": {
-    "start": "nodemon --watch src --exec ts-node src/index.ts"
+    "start": "nodemon --watch src --exec ts-node src/index.ts",
+    "test": "node --require ts-node/register/transpile-only --test test/roulette.test.js"
   },
   "devDependencies": {
     "@types/uuid": "^8.3.0",
