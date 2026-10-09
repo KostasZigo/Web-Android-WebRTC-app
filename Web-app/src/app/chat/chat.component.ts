@@ -120,8 +120,9 @@ export class ChatComponent implements AfterViewInit {
     }
   }
 
-  private handleGetUserMediaError(e: Error): void {
-    switch (e.name) {
+  private handleGetUserMediaError = (reason: unknown): void => {
+    const error = reason instanceof Error ? reason : new Error(String(reason));
+    switch (error.name) {
       case 'NotFoundError':
         alert('unable to open because no camera/mic');
         break;
@@ -130,12 +131,12 @@ export class ChatComponent implements AfterViewInit {
         //do nothing
         break;
       default:
-        console.log(e);
-        alert('Error opening your camera ' + e.message);
+        console.log(error);
+        alert('Error opening your camera ' + error.message);
         break;
     }
     this.closeVideoCall();
-  }
+  };
 
   private handleICECandidateEvent = (event: RTCPeerConnectionIceEvent) => {
     console.log(event);
