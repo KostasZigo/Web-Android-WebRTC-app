@@ -1,168 +1,148 @@
-import * as WebSocket from 'ws';
-//import { uuid } from 'uuidv4';
-const { v4: uuidV4 } = require('uuid');
-import { EventEmitter } from 'events';
-
-enum MessageType {
-  MATCHED = 'matched',
-  SDP = 'sdp',
-  ICE = 'ice',
-  PEER_LEFT = 'peer-left',
-  ON_GOING_CALL = 'on-going-call',
-  ANSWER = 'answer'
-}
-
-type AnswerMessage = {
-  type: MessageType.ANSWER
-  sdp: string
-}
-
-type MatchMessage = {
-  type: MessageType.MATCHED
-  match: string
-  offer: boolean
-}
-
-type SDPMessage = {
-  type: MessageType.SDP
-  sdp: string
-}
-
-type ICEMessage = {
-  type: MessageType.ICE
-  candidate: string,
-  label: number,
-  id: string
-}
-
-type PeerLeft = {
-  type: MessageType.PEER_LEFT
-}
-
-type OnGoingCall = {
-  type: MessageType.ON_GOING_CALL
-}
-
-type ClientMessage
-  = MatchMessage
-  | SDPMessage
-  | ICEMessage
-  | PeerLeft
-  | OnGoingCall
-  | AnswerMessage
+import { randomUUID } from 'node:crypto';
+import WebSocket, { RawData } from 'ws';
 
 type Session = {
-  id: string
-  ws: WebSocket
-  peer?: string
+  id: string;
+  socket: WebSocket;
+  peerId?: string;
+};
+
+type RelayMessage = {
+  type: 'sdp' | 'answer' | 'ice';
+  [key: string]: unknown;
+};
+
+type ServerMessage =
+  | { type: 'matched'; match: string; offer: boolean }
+  | { type: 'peer-left' }
+  | { type: 'on-going-call' };
+
+function hasFields(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isRelayMessage(value: Record<string, unknown>): value is RelayMessage {
+  if (value.type === 'sdp' || value.type === 'answer') {
+    return (typeof value.sdp === 'string' && value.sdp.length > 0) ||
+      (hasFields(value.data) && typeof value.data.sdp === 'string' && value.data.sdp.length > 0);
+  }
+  if (value.type === 'ice') {
+    return (typeof value.candidate === 'string' && value.candidate.length > 0) ||
+      (hasFields(value.data) && typeof value.data.candidate === 'string' && value.data.candidate.length > 0);
+  }
+  return false;
+}
+
+function messageText(data: RawData): string {
+  if (Buffer.isBuffer(data)) return data.toString('utf8');
+  if (Array.isArray(data)) return Buffer.concat(data).toString('utf8');
+  return Buffer.from(data).toString('utf8');
 }
 
 export default class Roulette {
+  private readonly sessions = new Map<string, Session>();
+  private waitingId?: string;
+  private activePair?: [string, string];
 
-  private sessions : Map<string, Session>;
-  private unmatched : string;
-  private onGoingCall : boolean;
+  register(socket: WebSocket): void {
+    socket.on('error', error => console.error('WebSocket connection failed:', error));
 
-  
-  constructor() {
-    this.sessions = new Map();
-    this.unmatched = "";
-	this.onGoingCall = false;
-  } 
-
-  register(ws: WebSocket) {
-    const id = uuidV4();
-    const session = { id, ws };
-
-    
-	console.log(id);
-	if(this.onGoingCall == false){
-		this.sessions.set(id, session);
-		this.tryMatch(session);
-	}else{
-		this.send(session, { type: MessageType.ON_GOING_CALL })
-	}
-	
-    
-    ws.on('close', () => this.unregister(id));
-    ws.on('error', () => this.unregister(id));
-    ws.on('message', (data: WebSocket.Data) => this.handleMessage(id, data.toString()));
-  }
-
-  private handleMessage(id: string, data: string) {
-    try {
-      const message = JSON.parse(data) as ClientMessage;
-	  const web_message = JSON.parse(data);
-      const session = this.sessions.get(id);
-      if(!session) { return console.error(`Can't find session for ${id}`); }
-      const peer = this.sessions.get(session.peer);
-      if(!peer) { return console.error(`Can't find session for peer of ${id}`); }
-      switch (message.type) {
-        case MessageType.SDP:
-			console.error("ELA 0");
-			console.error(`Error sending to ${web_message.hasOwnProperty('data')}`);
-			/*
-			if(web_message.hasOwnProperty('data')){
-				console.error("ELA 1");
-				this.send(peer, {type: MessageType.MATCHED, match: session.id, offer: true});
-			}*/
-			this.send(peer, message);
-			break;
-		case MessageType.ANSWER:
-        case MessageType.ICE:
-          this.send(peer, message);
-          break;
-		case MessageType.PEER_LEFT:
-		  this.send(peer, message);
-		  this.unregister(session.id);
-		  break;
-        default:
-          console.error(`Unexpected message from ${id}: ${data}`);
-          break;
-        }
-    } catch(err) {
-      console.error(`Unexpected error message from ${id}: ${data}`);
+    if (this.activePair) {
+      this.send(socket, { type: 'on-going-call' });
+      socket.on('message', () => this.reject(socket, 'Call in progress'));
+      return;
     }
-  }
 
-  private tryMatch(session: Session) {
-    if (this.unmatched != "") {
-      const match = this.unmatched;
-      const other = this.sessions.get(match);
-      if (other) {
-		
-        session.peer = match;
-        other.peer   = session.id;
-        this.send(session, {type: MessageType.MATCHED, match: other.id, offer: true});
-		this.send(other, {type: MessageType.MATCHED, match: session.id, offer: false});
-        this.onGoingCall = true
+    const session: Session = { id: randomUUID(), socket };
+    this.sessions.set(session.id, session);
+    socket.on('close', () => this.unregister(session.id));
+    socket.on('error', () => this.unregister(session.id));
+    socket.on('message', (data, isBinary) => {
+      if (isBinary) {
+        this.reject(socket, 'Text messages required');
+      } else {
+        this.handleMessage(session, messageText(data));
       }
+    });
+
+    if (this.waitingId) {
+      const other = this.sessions.get(this.waitingId);
+      if (!other) throw new Error('Waiting client is missing');
+
+      other.peerId = session.id;
+      session.peerId = other.id;
+      this.activePair = [other.id, session.id];
+      this.waitingId = undefined;
+      this.send(socket, { type: 'matched', match: other.id, offer: true });
+      this.send(other.socket, { type: 'matched', match: session.id, offer: false });
     } else {
-      this.unmatched = session.id;
+      this.waitingId = session.id;
     }
   }
 
-  private unregister(id: string) {
-    const session = this.sessions.get(id);
-	if(session && session.peer) {
-      const peer = this.sessions.get(session.peer);
-      if(peer) this.send(peer, { type: MessageType.PEER_LEFT })
-    }
-	if(id == this.unmatched){
-		this.unmatched = "";
-		this.onGoingCall = false
-	}
-	this.sessions.delete(id);
-  }
-
-  private send(session: Session, payload: ClientMessage) {
+  private handleMessage(session: Session, raw: string): void {
+    let parsed: unknown;
     try {
-      if(session.ws.readyState === WebSocket.OPEN) {
-        session.ws.send(JSON.stringify(payload));
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      this.reject(session.socket, 'Malformed JSON');
+      return;
+    }
+
+    if (!hasFields(parsed)) {
+      this.reject(session.socket, 'Invalid message');
+      return;
+    }
+
+    if (parsed.type === 'peer-left') {
+      this.unregister(session.id);
+      session.socket.close(1000, 'Hangup');
+      return;
+    }
+
+    if (!isRelayMessage(parsed)) {
+      this.reject(session.socket, 'Invalid signaling message');
+      return;
+    }
+
+    const peer = session.peerId && this.sessions.get(session.peerId);
+    if (!peer) {
+      this.reject(session.socket, 'No active peer');
+      return;
+    }
+    this.send(peer.socket, parsed);
+  }
+
+  private unregister(id: string): void {
+    const session = this.sessions.get(id);
+    if (!session) return;
+
+    this.sessions.delete(id);
+    if (this.waitingId === id) this.waitingId = undefined;
+    if (this.activePair?.includes(id)) this.activePair = undefined;
+
+    const peer = session.peerId ? this.sessions.get(session.peerId) : undefined;
+    if (peer?.peerId === id) {
+      peer.peerId = undefined;
+      if (peer.socket.readyState === WebSocket.OPEN) {
+        this.send(peer.socket, { type: 'peer-left' });
       }
-    } catch(err) {
-      console.error(`Error sending to ${session.id}`);
     }
   }
 
+  private reject(socket: WebSocket, reason: string): void {
+    console.warn(`Rejected signaling message: ${reason}`);
+    if (socket.readyState === WebSocket.OPEN) socket.close(1008, reason);
+  }
+
+  private send(socket: WebSocket, message: RelayMessage | ServerMessage): void {
+    if (socket.readyState !== WebSocket.OPEN) {
+      console.error('Could not send signaling message: socket is not open');
+      return;
+    }
+    socket.send(JSON.stringify(message), error => {
+      if (error) console.error('Could not send signaling message:', error);
+    });
+  }
 }
