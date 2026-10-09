@@ -1,0 +1,11 @@
+{
+  "type": "sdp",
+  "data": {
+    "type": "offer",
+    "sdp": "v=0\r\na=setup:actpass\r\n"
+  },
+  "sdp": "v=0\r\na=setup:actpass\r\n",
+  "candidate": "",
+  "id": "",
+  "label": ""
+}

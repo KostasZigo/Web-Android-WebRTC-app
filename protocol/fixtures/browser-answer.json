@@ -1,0 +1,11 @@
+{
+  "type": "answer",
+  "data": {
+    "type": "answer",
+    "sdp": "v=0\r\na=setup:active\r\n"
+  },
+  "sdp": "v=0\r\na=setup:active\r\n",
+  "candidate": "",
+  "id": "",
+  "label": ""
+}

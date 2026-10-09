@@ -1,6 +1,19 @@
 const assert = require('node:assert/strict');
+const { readFileSync } = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const { connectClient, startServer } = require('./websocket-test-helpers');
+
+function fixture(name) {
+  return JSON.parse(readFileSync(path.join(__dirname, '..', '..', 'protocol', 'fixtures', `${name}.json`), 'utf8'));
+}
+
+test('explains that an HTTP visit needs a WebSocket upgrade', async t => {
+  const url = await startServer(t);
+  const response = await fetch(url.replace(/^ws:/, 'http:'));
+  assert.equal(response.status, 426);
+  assert.match(await response.text(), /Upgrade Required/i);
+});
 
 test('matches the first two clients and relays browser and Android signaling', async t => {
   const url = await startServer(t);
@@ -40,6 +53,26 @@ test('relays offers, answers, and ICE without rewriting their envelopes', async 
   };
   browser.send(candidate);
   assert.deepEqual(await android.receive(), candidate);
+});
+
+test('preserves the Android and browser wire examples in both directions', async t => {
+  const url = await startServer(t);
+  const android = await connectClient(t, url);
+  const browser = await connectClient(t, url);
+  await Promise.all([android.receive(), browser.receive()]);
+
+  for (const [sender, receiver, name] of [
+    [browser, android, 'browser-offer'],
+    [android, browser, 'android-answer'],
+    [browser, android, 'browser-ice'],
+    [android, browser, 'android-ice'],
+    [android, browser, 'android-offer'],
+    [browser, android, 'browser-answer']
+  ]) {
+    const message = fixture(name);
+    sender.send(message);
+    assert.deepEqual(await receiver.receive(), message, `${name} should be relayed unchanged`);
+  }
 });
 
 test('rejects a third client while a call is active', async t => {
