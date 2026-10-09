@@ -1,0 +1,6 @@
+{
+  "type": "ice",
+  "candidate": "candidate:1 1 udp 1 192.0.2.1 5000 typ host",
+  "id": "video",
+  "label": 0
+}

@@ -1,0 +1,12 @@
+{
+  "type": "ice",
+  "data": {
+    "candidate": "candidate:2 1 udp 1 192.0.2.2 5001 typ host",
+    "sdpMid": "video",
+    "sdpMLineIndex": 0
+  },
+  "sdp": "",
+  "candidate": "",
+  "id": "",
+  "label": ""
+}
