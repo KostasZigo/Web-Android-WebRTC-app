@@ -80,6 +80,20 @@ describe('ChatComponent', () => {
     );
   });
 
+  it('shows a failed offer and closes its connection', async () => {
+    spyOn(FakePeerConnection.prototype, 'createOffer').and.returnValue(
+      Promise.reject('camera unavailable')
+    );
+    const alertSpy = spyOn(window, 'alert');
+
+    click('Call');
+    await fixture.whenStable();
+
+    expect(alertSpy).toHaveBeenCalledWith('Error opening your camera camera unavailable');
+    expect(FakePeerConnection.instances[0].closed).toBe(true);
+    expect(signaling.sendMessage).not.toHaveBeenCalled();
+  });
+
   it('sends a hang-up after a call and closes the active connection', async () => {
     click('Call');
     await fixture.whenStable();
