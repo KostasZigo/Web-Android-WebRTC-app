@@ -78,18 +78,18 @@
         "serve": {
           "builder": "@angular-devkit/build-angular:dev-server",
           "options": {
-            "browserTarget": "webTerra:build"
+            "buildTarget": "webTerra:build"
           },
           "configurations": {
             "production": {
-              "browserTarget": "webTerra:build:production"
+              "buildTarget": "webTerra:build:production"
             }
           }
         },
         "extract-i18n": {
           "builder": "@angular-devkit/build-angular:extract-i18n",
           "options": {
-            "browserTarget": "webTerra:build"
+            "buildTarget": "webTerra:build"
           }
         },
         "test": {

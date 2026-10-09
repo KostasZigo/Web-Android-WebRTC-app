@@ -1,5 +1,7 @@
 import { NO_ERRORS_SCHEMA } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MatButtonModule } from '@angular/material/button';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Subject } from 'rxjs';
 import { ChatComponent } from './chat.component';
 import { DataService } from './service/data.service';
@@ -35,6 +37,7 @@ describe('ChatComponent', () => {
     restorePeerConnection = replaceProperty(window, 'RTCPeerConnection', FakePeerConnection);
     await TestBed.configureTestingModule({
       declarations: [ChatComponent],
+      imports: [MatButtonModule, NoopAnimationsModule],
       providers: [{ provide: DataService, useValue: signaling }],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
@@ -68,6 +71,15 @@ describe('ChatComponent', () => {
     click('Stop');
     expect(media.track.enabled).toBe(false);
     expect(preview.srcObject).toBeNull();
+  });
+
+  it('keeps the four call controls available', () => {
+    const buttons: HTMLButtonElement[] = Array.from(fixture.nativeElement.querySelectorAll('button'));
+
+    expect(buttons.map(button => button.textContent?.trim())).toEqual([
+      'Start', 'Stop', 'Call', 'Hangup'
+    ]);
+    expect(buttons.every(button => !button.disabled)).toBeTrue();
   });
 
   it('sends an offer when Call is clicked', async () => {

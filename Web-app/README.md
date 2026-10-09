@@ -1,27 +1,40 @@
-# WebTerra
+# Web client
 
-This project was generated with [Angular CLI](https://github.com/angular/angular-cli) version 11.2.8.
+This Angular 19 app connects a browser to the two-person WebRTC signaling
+server. Use Node.js 22 LTS for this checkpoint.
 
-## Development server
+## Start the app
 
-Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The app will automatically reload if you change any of the source files.
+From `Web-app`:
 
-## Code scaffolding
+```powershell
+npm ci
+npm start
+```
 
-Run `ng generate component component-name` to generate a new component. You can also use `ng generate directive|pipe|service|class|guard|interface|enum|module`.
+Open http://localhost:4200. The signaling server must also be running on
+port 8000. Set `WS_ENDPOINT` in `src\app\chat\service\data.service.ts` to
+`ws://localhost:8000/` for a server on the same computer, or use its LAN
+address for a separate device. Port 8000 is for WebSockets, not a web page.
 
-## Build
+## Check changes
 
-Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory. Use the `--prod` flag for a production build.
+Run the browser tests with Chrome installed:
 
-## Running unit tests
+```powershell
+npm test -- --watch=false --browsers=ChromeHeadless
+```
 
-Run `ng test` to execute the unit tests via [Karma](https://karma-runner.github.io).
+If Chrome is not found automatically on Windows, set `CHROME_BIN` to its
+executable path first. For a production build, choose a folder outside this
+repository because `dist` still contains tracked older build files:
 
-## Running end-to-end tests
+```powershell
+npm run build -- --configuration production --output-path "$env:TEMP\webrtc-web-build"
+```
 
-Run `ng e2e` to execute the end-to-end tests via [Protractor](http://www.protractortest.org/).
-
-## Further help
-
-To get more help on the Angular CLI use `ng help` or go check out the [Angular CLI Overview and Command Reference](https://angular.io/cli) page.
+The current build succeeds but warns that its initial bundle is 533.16 kB,
+above the existing 500 kB warning limit. The limit has not been raised.
+Linting and browser end-to-end tests still need their planned replacements
+for TSLint and Protractor. Node.js 24 LTS becomes the web target after the
+planned Angular 22 upgrade.

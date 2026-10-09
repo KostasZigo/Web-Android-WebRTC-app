@@ -11,9 +11,8 @@ The project was inspired and developed within the framework of an internship and
 
 - Node.js 24.15 or later on the 24 LTS line for the signaling server.
 - Android Studio for the Android client.
-- The web client is still on Angular 11, which requires an older, now unsupported
-  Node.js version. Use a compatible Node version only for local development
-  until the planned Angular upgrade is complete.
+- Node.js 22 LTS for the current Angular 19 web client. The planned Angular 22
+  upgrade will let the web client move to Node.js 24 LTS as well.
 
 ## Getting started
 
@@ -31,8 +30,7 @@ The server listens on port 8000 by default. Set `PORT` to a different port
 before starting it if needed. For live server development, use `npm run dev`.
 Run `npm test` from `server` to check matching and message relay.
 
-In another terminal, using a Node version compatible with the current Angular
-11 project, start the web client:
+In another terminal, using Node.js 22 LTS, start the web client:
 
 ```text
 cd Web-Android-WebRTC-app\Web-app
