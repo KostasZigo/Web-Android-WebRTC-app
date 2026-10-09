@@ -1,0 +1,11 @@
+/plan.md
+/.copilot/
+**/node_modules/
+**/coverage/
+/server/dist/
+/Web-app/dist/
+/Web-app/src/app.zip
+/Android-app/.gradle/
+/Android-app/build/
+/Android-app/app/build/
+/Android-app/local.properties
