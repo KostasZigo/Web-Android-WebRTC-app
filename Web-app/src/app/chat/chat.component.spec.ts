@@ -94,7 +94,7 @@ describe('ChatComponent', () => {
 
   it('shows a failed offer and closes its connection', async () => {
     vi.spyOn(FakePeerConnection.prototype, 'createOffer').mockRejectedValue('camera unavailable');
-    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
 
     click('Call');
     await fixture.whenStable();

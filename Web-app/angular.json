@@ -26,7 +26,9 @@
             },
             "index": "src/index.html",
             "browser": "src/main.ts",
-            "polyfills": ["src/polyfills.ts"],
+            "polyfills": [
+              "src/polyfills.ts"
+            ],
             "tsConfig": "tsconfig.app.json",
             "assets": [
               "src/favicon.ico",
@@ -44,7 +46,10 @@
           },
           "configurations": {
             "testing": {
-              "polyfills": ["zone.js", "zone.js/testing"]
+              "polyfills": [
+                "zone.js",
+                "zone.js/testing"
+              ]
             },
             "production": {
               "fileReplacements": [
@@ -101,8 +106,14 @@
             "buildTarget": "webTerra:build:testing",
             "tsConfig": "tsconfig.spec.json",
             "runner": "vitest",
-            "browsers": ["chromiumHeadless"],
-            "coverageReporters": ["text-summary", "html", "lcov"],
+            "browsers": [
+              "chromiumHeadless"
+            ],
+            "coverageReporters": [
+              "text-summary",
+              "html",
+              "lcov"
+            ],
             "coverageThresholds": {
               "statements": 80,
               "branches": 65
@@ -119,6 +130,15 @@
             "production": {
               "devServerTarget": "webTerra:serve:production"
             }
+          }
+        },
+        "lint": {
+          "builder": "@angular-eslint/builder:lint",
+          "options": {
+            "lintFilePatterns": [
+              "src/**/*.ts",
+              "src/**/*.html"
+            ]
           }
         }
       }
