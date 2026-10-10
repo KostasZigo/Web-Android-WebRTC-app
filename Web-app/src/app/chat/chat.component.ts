@@ -6,6 +6,7 @@ import {
   OnInit,
   ViewChild,
   Inject,
+  ChangeDetectionStrategy
 } from '@angular/core';
 import { DataService } from './service/data.service';
 import { Message } from './types/message';
@@ -24,6 +25,7 @@ const offerOptions = {
   selector: 'app-chat',
   templateUrl: './chat.component.html',
   styleUrls: ['./chat.component.css'],
+  changeDetection: ChangeDetectionStrategy.Eager,
   standalone: false
 })
 export class ChatComponent implements AfterViewInit {
