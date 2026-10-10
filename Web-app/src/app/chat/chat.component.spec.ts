@@ -1,4 +1,4 @@
-import { NO_ERRORS_SCHEMA } from '@angular/core';
+import { NO_ERRORS_SCHEMA, provideZoneChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatButtonModule } from '@angular/material/button';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
@@ -38,7 +38,7 @@ describe('ChatComponent', () => {
     await TestBed.configureTestingModule({
       declarations: [ChatComponent],
       imports: [MatButtonModule, NoopAnimationsModule],
-      providers: [{ provide: DataService, useValue: signaling }],
+      providers: [provideZoneChangeDetection(), { provide: DataService, useValue: signaling }],
       schemas: [NO_ERRORS_SCHEMA]
     }).compileComponents();
     fixture = TestBed.createComponent(ChatComponent);

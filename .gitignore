@@ -5,6 +5,7 @@
 **/coverage/
 /server/dist/
 /Web-app/dist/
+/Web-app/.angular/
 /Web-app/src/app.zip
 /Android-app/.gradle/
 /Android-app/build/
