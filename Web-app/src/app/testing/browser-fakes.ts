@@ -13,7 +13,7 @@ export function replaceProperty(target: object, name: string, value: unknown): (
 export function createTestMedia(): { stream: MediaStream; track: MediaStreamTrack } {
   const stream = new MediaStream();
   const track = { enabled: true } as MediaStreamTrack;
-  spyOn(stream, 'getTracks').and.returnValue([track]);
+  vi.spyOn(stream, 'getTracks').mockReturnValue([track]);
   return { stream, track };
 }
 

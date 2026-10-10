@@ -1,8 +1,9 @@
-import { NO_ERRORS_SCHEMA, provideZoneChangeDetection } from '@angular/core';
+import { provideZoneChangeDetection } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { MatButtonModule } from '@angular/material/button';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { Subject } from 'rxjs';
+import type { Mock } from 'vitest';
+import { AppModule } from '../app.module';
 import { ChatComponent } from './chat.component';
 import { DataService } from './service/data.service';
 import { Message } from './types/message';
@@ -13,9 +14,9 @@ describe('ChatComponent', () => {
   let media: ReturnType<typeof createTestMedia>;
   let incoming: Subject<Message>;
   let signaling: {
-    connect: jasmine.Spy;
-    sendMessage: jasmine.Spy;
-    closeWebSocket: jasmine.Spy;
+    connect: Mock<() => void>;
+    sendMessage: Mock<(message: Message) => void>;
+    closeWebSocket: Mock<() => void>;
     messages$: Subject<Message>;
   };
   let restoreMediaDevices: () => void;
@@ -25,21 +26,19 @@ describe('ChatComponent', () => {
     media = createTestMedia();
     incoming = new Subject<Message>();
     signaling = {
-      connect: jasmine.createSpy('connect'),
-      sendMessage: jasmine.createSpy('sendMessage'),
-      closeWebSocket: jasmine.createSpy('closeWebSocket'),
+      connect: vi.fn(),
+      sendMessage: vi.fn(),
+      closeWebSocket: vi.fn(),
       messages$: incoming
     };
     FakePeerConnection.instances = [];
     restoreMediaDevices = replaceProperty(navigator, 'mediaDevices', {
-      getUserMedia: jasmine.createSpy('getUserMedia').and.returnValue(Promise.resolve(media.stream))
+      getUserMedia: vi.fn().mockResolvedValue(media.stream)
     });
     restorePeerConnection = replaceProperty(window, 'RTCPeerConnection', FakePeerConnection);
     await TestBed.configureTestingModule({
-      declarations: [ChatComponent],
-      imports: [MatButtonModule, NoopAnimationsModule],
-      providers: [provideZoneChangeDetection(), { provide: DataService, useValue: signaling }],
-      schemas: [NO_ERRORS_SCHEMA]
+      imports: [AppModule, NoopAnimationsModule],
+      providers: [provideZoneChangeDetection(), { provide: DataService, useValue: signaling }]
     }).compileComponents();
     fixture = TestBed.createComponent(ChatComponent);
     fixture.detectChanges();
@@ -50,6 +49,7 @@ describe('ChatComponent', () => {
     fixture.destroy();
     restorePeerConnection();
     restoreMediaDevices();
+    vi.restoreAllMocks();
   });
 
   function click(label: string): void {
@@ -79,7 +79,7 @@ describe('ChatComponent', () => {
     expect(buttons.map(button => button.textContent?.trim())).toEqual([
       'Start', 'Stop', 'Call', 'Hangup'
     ]);
-    expect(buttons.every(button => !button.disabled)).toBeTrue();
+    expect(buttons.every(button => !button.disabled)).toBe(true);
   });
 
   it('sends an offer when Call is clicked', async () => {
@@ -88,15 +88,13 @@ describe('ChatComponent', () => {
     await fixture.whenStable();
 
     expect(signaling.sendMessage).toHaveBeenCalledWith(
-      jasmine.objectContaining({ type: 'sdp', sdp: 'v=0\r\n' })
+      expect.objectContaining({ type: 'sdp', sdp: 'v=0\r\n' })
     );
   });
 
   it('shows a failed offer and closes its connection', async () => {
-    spyOn(FakePeerConnection.prototype, 'createOffer').and.returnValue(
-      Promise.reject('camera unavailable')
-    );
-    const alertSpy = spyOn(window, 'alert');
+    vi.spyOn(FakePeerConnection.prototype, 'createOffer').mockRejectedValue('camera unavailable');
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
     click('Call');
     await fixture.whenStable();
@@ -109,14 +107,28 @@ describe('ChatComponent', () => {
   it('sends a hang-up after a call and closes the active connection', async () => {
     click('Call');
     await fixture.whenStable();
-    signaling.sendMessage.calls.reset();
+    signaling.sendMessage.mockClear();
 
     click('Hangup');
 
     expect(signaling.sendMessage).toHaveBeenCalledWith(
-      jasmine.objectContaining({ type: 'peer-left' })
+      expect.objectContaining({ type: 'peer-left' })
     );
     expect(FakePeerConnection.instances[0].closed).toBe(true);
+  });
+
+  it('closes the call when the other caller leaves', async () => {
+    click('Call');
+    await fixture.whenStable();
+    const activeCall = FakePeerConnection.instances[0];
+
+    if (!fixture.ngZone) throw new Error('Angular test zone is unavailable');
+    fixture.ngZone.run(() => incoming.next({
+      type: 'peer-left', data: '', sdp: '', candidate: '', id: '', label: ''
+    }));
+
+    expect(activeCall.closed).toBe(true);
+    expect(signaling.closeWebSocket).toHaveBeenCalledOnce();
   });
 
   it('answers an incoming offer', async () => {
@@ -130,7 +142,7 @@ describe('ChatComponent', () => {
     await fixture.whenStable();
 
     expect(signaling.sendMessage).toHaveBeenCalledWith(
-      jasmine.objectContaining({ type: 'answer', sdp: 'v=0\r\n' })
+      expect.objectContaining({ type: 'answer', sdp: 'v=0\r\n' })
     );
   });
 });
