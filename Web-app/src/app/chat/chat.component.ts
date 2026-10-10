@@ -1,15 +1,11 @@
-import { JSDocComment } from '@angular/compiler';
 import {
   AfterViewInit,
   Component,
   ElementRef,
-  OnInit,
   ViewChild,
-  Inject,
   ChangeDetectionStrategy
 } from '@angular/core';
 import { DataService } from './service/data.service';
-import { Message } from './types/message';
 
 const mediaConstraints = {
   audio: true,
@@ -181,7 +177,6 @@ export class ChatComponent implements AfterViewInit {
   };
 
   private addIncomingMessageHandling(): void {
-    var android_message = '2';
     this.dataService.connect();
 
     this.dataService.messages$.subscribe(
@@ -201,7 +196,7 @@ export class ChatComponent implements AfterViewInit {
             this.handleAnswerMessage(msg.data);
             break;
           case 'peer-left': //'hangup':
-            this.handleHangupMessage(msg);
+            this.handleHangupMessage();
             break;
           case 'ice':
             if (msg.data == undefined) {
@@ -273,7 +268,7 @@ export class ChatComponent implements AfterViewInit {
     this.peerConnection.setRemoteDescription(data);
   }
 
-  private handleHangupMessage(msg: Message): void {
+  private handleHangupMessage(): void {
     this.closeVideoCall();
    // window.location.reload(); //tha to bgalw , dexomai ena peer-left apo to kin pou den to katalabainw
     this.dataService.closeWebSocket()

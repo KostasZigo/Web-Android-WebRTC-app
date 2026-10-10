@@ -1,7 +1,7 @@
 # Web client
 
-This Angular 19 app connects a browser to the two-person WebRTC signaling
-server. Use Node.js 22 LTS for this checkpoint.
+This Angular 22 app connects a browser to the two-person WebRTC signaling
+server. Use Node.js 24.15 or later on the 24 LTS line.
 
 ## Start the app
 
@@ -19,22 +19,31 @@ address for a separate device. Port 8000 is for WebSockets, not a web page.
 
 ## Check changes
 
-Run the browser tests with Chrome installed:
+Install Playwright's test browser once, then run the headless browser tests
+with coverage and the Angular/TypeScript lint rules:
 
 ```powershell
-npm test -- --watch=false --browsers=ChromeHeadless
+npx playwright install chromium
+npm run test:ci
+npm run lint
 ```
 
-If Chrome is not found automatically on Windows, set `CHROME_BIN` to its
-executable path first. For a production build, choose a folder outside this
-repository because `dist` still contains tracked older build files:
+If you already have Chrome installed, you can set `CHROME_BIN` to its
+executable path instead of downloading Chromium. The test command runs
+Vitest in headless Chromium and writes reports to `coverage\webTerra`;
+the current checks require at least 80% statement coverage and 65% branch
+coverage. Branch coverage is 68.65%, short of the longer-term 80% goal.
+
+For a production build, choose a folder outside this repository because
+`dist` still contains tracked older build files:
 
 ```powershell
 npm run build -- --configuration production --output-path "$env:TEMP\webrtc-web-build"
 ```
 
-The current build succeeds but warns that its initial bundle is 533.16 kB,
+With this output override, Angular places the browser files in the
+`browser` subfolder. Normal builds keep the old `dist\webTerra` asset path.
+The current build succeeds but warns that its initial bundle is 573.36 kB,
 above the existing 500 kB warning limit. The limit has not been raised.
-Linting and browser end-to-end tests still need their planned replacements
-for TSLint and Protractor. Node.js 24 LTS becomes the web target after the
-planned Angular 22 upgrade.
+The old Protractor browser end-to-end tests still need their planned
+replacement.

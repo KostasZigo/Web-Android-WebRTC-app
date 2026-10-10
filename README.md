@@ -9,10 +9,9 @@ The project was inspired and developed within the framework of an internship and
 
 ## Requirements
 
-- Node.js 24.15 or later on the 24 LTS line for the signaling server.
+- Node.js 24.15 or later on the 24 LTS line for both the signaling server
+  and the Angular 22 web client.
 - Android Studio for the Android client.
-- Node.js 22 LTS for the current Angular 19 web client. The planned Angular 22
-  upgrade will let the web client move to Node.js 24 LTS as well.
 
 ## Getting started
 
@@ -30,7 +29,7 @@ The server listens on port 8000 by default. Set `PORT` to a different port
 before starting it if needed. For live server development, use `npm run dev`.
 Run `npm test` from `server` to check matching and message relay.
 
-In another terminal, using Node.js 22 LTS, start the web client:
+In another terminal, using Node.js 24 LTS, start the web client:
 
 ```text
 cd Web-Android-WebRTC-app\Web-app
@@ -41,6 +40,11 @@ npm start
 Open **http://localhost:4200** for the web interface. Port 8000 accepts
 WebSocket connections at **ws://localhost:8000/**, not ordinary HTTP pages.
 Seeing **Upgrade Required** at http://localhost:8000 is expected.
+
+To check web changes from `Web-app`, run `npm run lint`. Install the test
+browser with `npx playwright install chromium`, then run `npm run test:ci`
+for the headless browser tests and coverage report. See
+[`Web-app\README.md`](Web-app/README.md) for build instructions.
 
 For a browser on the server machine, set `WS_ENDPOINT` in
 `Web-app\src\app\chat\service\data.service.ts` to `ws://localhost:8000/`.
