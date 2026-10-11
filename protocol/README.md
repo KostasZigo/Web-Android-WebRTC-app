@@ -31,3 +31,10 @@ match role or an outstanding local offer for Android's top-level `sdp`.
 Both clients still send their existing wire shapes; the server does not
 translate them. Invalid incoming messages are reported by the browser
 instead of being treated as offers.
+
+Android also reads the shared examples in its JVM tests. It accepts
+top-level Android fields and nested browser `data` objects, checks for
+missing or conflicting fields, and reports invalid messages and socket
+failures to the call screen. Android continues to send top-level `sdp` for
+both its offers and answers, and top-level ICE fields; no wire format
+changes are needed.

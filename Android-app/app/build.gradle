@@ -27,6 +27,11 @@ android {
     buildFeatures {
         viewBinding = true
     }
+    sourceSets {
+        test {
+            resources.srcDir('../../protocol/fixtures')
+        }
+    }
 }
 
 kotlin {
@@ -43,6 +48,7 @@ dependencies {
     implementation 'io.github.webrtc-sdk:android:150.7871.01'
     implementation 'com.squareup.okhttp3:okhttp:5.5.0'
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20260814'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
 }

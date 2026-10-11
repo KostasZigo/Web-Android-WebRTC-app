@@ -100,6 +100,10 @@ class VideoCallSession(
 
     init {
         signaler.messageHandler = this::onMessage
+        signaler.errorHandler = { error ->
+            Log.e(TAG, "Signaling failed", error)
+            onStatusChangedListener(VideoCallStatus.FAILED)
+        }
         this.onStatusChangedListener(VideoCallStatus.MATCHING)
         executor.execute(this::init)
     }
@@ -163,10 +167,10 @@ class VideoCallSession(
         onStatusChangedListener(VideoCallStatus.FINISHED)
     }
 
-    private fun handleRemoteCandidate(label: Int, id: String, strCandidate: String) {
+    private fun handleRemoteCandidate(label: Int, id: String?, strCandidate: String) {
         Log.i(TAG, "Got remote ICE candidate $strCandidate")
         executor.execute {
-            val candidate = IceCandidate(id, label, strCandidate)
+            val candidate = IceCandidate(id ?: "", label, strCandidate)
             peerConnection?.addIceCandidate(candidate)
         }
     }
