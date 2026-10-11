@@ -6,30 +6,34 @@ import type { Mock } from 'vitest';
 import { AppModule } from '../app.module';
 import { ChatComponent } from './chat.component';
 import { DataService } from './service/data.service';
-import { Message } from './types/message';
+import { IncomingMessage, OutgoingMessage } from './types/message';
 import { createTestMedia, FakePeerConnection, replaceProperty } from '../testing/browser-fakes';
 
 describe('ChatComponent', () => {
   let fixture: ComponentFixture<ChatComponent>;
   let media: ReturnType<typeof createTestMedia>;
-  let incoming: Subject<Message>;
+  let incoming: Subject<IncomingMessage>;
+  let failures: Subject<Error>;
   let signaling: {
     connect: Mock<() => void>;
-    sendMessage: Mock<(message: Message) => void>;
+    sendMessage: Mock<(message: OutgoingMessage) => void>;
     closeWebSocket: Mock<() => void>;
-    messages$: Subject<Message>;
+    messages$: Subject<IncomingMessage>;
+    errors$: Subject<Error>;
   };
   let restoreMediaDevices: () => void;
   let restorePeerConnection: () => void;
 
   beforeEach(async () => {
     media = createTestMedia();
-    incoming = new Subject<Message>();
+    incoming = new Subject<IncomingMessage>();
+    failures = new Subject<Error>();
     signaling = {
       connect: vi.fn(),
       sendMessage: vi.fn(),
       closeWebSocket: vi.fn(),
-      messages$: incoming
+      messages$: incoming,
+      errors$: failures
     };
     FakePeerConnection.instances = [];
     restoreMediaDevices = replaceProperty(navigator, 'mediaDevices', {
@@ -123,9 +127,7 @@ describe('ChatComponent', () => {
     const activeCall = FakePeerConnection.instances[0];
 
     if (!fixture.ngZone) throw new Error('Angular test zone is unavailable');
-    fixture.ngZone.run(() => incoming.next({
-      type: 'peer-left', data: '', sdp: '', candidate: '', id: '', label: ''
-    }));
+    fixture.ngZone.run(() => incoming.next({ type: 'peer-left' }));
 
     expect(activeCall.closed).toBe(true);
     expect(signaling.closeWebSocket).toHaveBeenCalledOnce();
@@ -135,8 +137,7 @@ describe('ChatComponent', () => {
     if (!fixture.ngZone) throw new Error('Angular test zone is unavailable');
     fixture.ngZone.run(() => {
       incoming.next({
-        type: 'sdp', data: { type: 'offer', sdp: 'v=0\r\n' },
-        sdp: 'v=0\r\n', candidate: '', id: '', label: ''
+        type: 'offer', description: { type: 'offer', sdp: 'v=0\r\n' }
       });
     });
     await fixture.whenStable();
@@ -144,5 +145,49 @@ describe('ChatComponent', () => {
     expect(signaling.sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'answer', sdp: 'v=0\r\n' })
     );
+  });
+
+  it('applies an Android answer to the current call instead of answering it again', async () => {
+    const remoteDescription = vi.spyOn(FakePeerConnection.prototype, 'setRemoteDescription');
+    click('Call');
+    await fixture.whenStable();
+    if (!fixture.ngZone) throw new Error('Angular test zone is unavailable');
+
+    fixture.ngZone.run(() => incoming.next({
+      type: 'answer', description: { type: 'answer', sdp: 'android-answer' }
+    }));
+    await fixture.whenStable();
+
+    expect(remoteDescription).toHaveBeenCalledWith({
+      type: 'answer', sdp: 'android-answer'
+    });
+    expect(signaling.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows signaling failures once until a new match and reports busy calls', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    if (!fixture.ngZone) throw new Error('Angular test zone is unavailable');
+    fixture.ngZone.run(() => {
+      failures.next(new Error('Connection lost'));
+      failures.next(new Error('Connection lost'));
+      incoming.next({ type: 'matched', match: 'peer-1', offer: false });
+      failures.next(new Error('Connection lost'));
+      incoming.next({ type: 'on-going-call' });
+    });
+
+    expect(alertSpy.mock.calls.map(([message]) => message)).toEqual([
+      'Connection lost', 'Connection lost', 'A call is already in progress. Try again later.'
+    ]);
+    expect(signaling.closeWebSocket).toHaveBeenCalledOnce();
+  });
+
+  it('stops listening to signaling events when the component is destroyed', () => {
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => undefined);
+    fixture.destroy();
+    failures.next(new Error('Connection lost'));
+    incoming.next({ type: 'on-going-call' });
+
+    expect(alertSpy).not.toHaveBeenCalled();
+    expect(signaling.closeWebSocket).toHaveBeenCalledOnce();
   });
 });

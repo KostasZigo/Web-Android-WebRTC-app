@@ -25,9 +25,9 @@ call's media descriptions:
 | Android | `type: "sdp"` with top-level `sdp` for both offers **and answers** | Top-level `candidate`, `id` (media ID), and numeric `label` (media-line index) |
 | Browser | `type: "sdp"` for offers or `type: "answer"` for answers, with `data: {type, sdp}` and top-level `sdp` | `data: {candidate, sdpMid, sdpMLineIndex}`; current browser code also sends empty legacy fields |
 
-Android currently distinguishes an incoming `sdp` offer from an answer using
-its match role. The browser currently treats **every** incoming `sdp` as an
-offer, so an Android answer sent as `sdp` is not yet handled correctly by the
-browser. This is a known client-side bug, not a server translation feature;
-the planned browser signaling refactor will fix it. The server tests assert
-the existing wire shapes remain unchanged while clients are upgraded.
+Android distinguishes an incoming `sdp` offer from an answer using its match
+role. The browser now reads the nested SDP type when available and uses its
+match role or an outstanding local offer for Android's top-level `sdp`.
+Both clients still send their existing wire shapes; the server does not
+translate them. Invalid incoming messages are reported by the browser
+instead of being treated as offers.

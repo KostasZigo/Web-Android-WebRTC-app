@@ -46,8 +46,11 @@ browser with `npx playwright install chromium`, then run `npm run test:ci`
 for the headless browser tests and coverage report. See
 [`Web-app\README.md`](Web-app/README.md) for build instructions.
 
-For a browser on the server machine, set `WS_ENDPOINT` in
-`Web-app\src\app\chat\service\data.service.ts` to `ws://localhost:8000/`.
+The browser connects to port 8000 on the page's hostname by default:
+`ws://<hostname>:8000/`, or `wss://<hostname>:8000/` for HTTPS pages. The
+server must be reachable from the browser; HTTPS also needs a secure
+WebSocket endpoint. To use another address, provide `SIGNALING_URL` in the
+Angular module as described in [`Web-app\README.md`](Web-app/README.md).
 For Android, set `BACKEND_URL` in `VideoCallActivity.kt` to your computer's
 LAN IP address: `localhost` on a phone means the phone itself. The current
 `server\docker-compose.yml` still needs its web build path fixed; do not use
