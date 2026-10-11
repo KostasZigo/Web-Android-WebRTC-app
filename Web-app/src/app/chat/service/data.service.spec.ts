@@ -8,6 +8,7 @@ describe('DataService', () => {
   let restoreWebSocket: () => void;
   let received: IncomingMessage[];
   let errors: Error[];
+  let disconnects: number;
 
   beforeEach(() => {
     FakeWebSocket.instances = [];
@@ -18,8 +19,10 @@ describe('DataService', () => {
     service = TestBed.inject(DataService);
     received = [];
     errors = [];
+    disconnects = 0;
     service.messages$.subscribe(message => received.push(message));
     service.errors$.subscribe(error => errors.push(error));
+    service.disconnected$.subscribe(() => { disconnects++; });
   });
 
   afterEach(() => {
@@ -166,6 +169,7 @@ describe('DataService', () => {
     socket.onerror?.(new Event('error'));
 
     expect(errors[0].message).toBe('Signaling connection failed');
+    expect(disconnects).toBe(1);
     service.closeWebSocket();
     await vi.advanceTimersByTimeAsync(2000);
 
@@ -184,6 +188,27 @@ describe('DataService', () => {
 
     expect(FakeWebSocket.instances).toHaveLength(1);
     expect(errors).toEqual([]);
+    expect(disconnects).toBe(0);
+  });
+
+  it('reconnects after a normal hang-up without reporting a connection error', async () => {
+    vi.useFakeTimers();
+    const socket = await connect();
+    service.sendMessage({
+      type: 'peer-left', data: '', sdp: '', candidate: '', id: '', label: ''
+    });
+    socket.onclose?.(new CloseEvent('close', {
+      code: 1000, reason: 'Hangup', wasClean: true
+    }));
+
+    expect(disconnects).toBe(1);
+    expect(errors).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(FakeWebSocket.instances).toHaveLength(2);
+
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    FakeWebSocket.instances[1].onclose?.(new CloseEvent('close', { code: 1000 }));
+    expect(errors[0].message).toContain('Signaling connection closed (1000)');
   });
 
   it('does not leave a live socket behind when closed before it opens', async () => {
@@ -205,6 +230,7 @@ describe('DataService', () => {
     socket.onclose?.(new CloseEvent('close', { code: 1011, reason: 'server failed' }));
 
     expect(errors[0].message).toContain('1011: server failed');
+    expect(disconnects).toBe(1);
     await vi.advanceTimersByTimeAsync(1000);
     expect(FakeWebSocket.instances).toHaveLength(2);
     FakeWebSocket.instances[1].receive({ type: 'matched', match: 'peer-2', offer: false });

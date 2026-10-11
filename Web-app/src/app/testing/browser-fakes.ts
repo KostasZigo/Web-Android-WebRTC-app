@@ -13,6 +13,7 @@ export function replaceProperty(target: object, name: string, value: unknown): (
 export function createTestMedia(): { stream: MediaStream; track: MediaStreamTrack } {
   const stream = new MediaStream();
   const track = { enabled: true } as MediaStreamTrack;
+  track.stop = vi.fn();
   vi.spyOn(stream, 'getTracks').mockReturnValue([track]);
   return { stream, track };
 }
@@ -59,13 +60,24 @@ export class FakeWebSocket {
 export class FakePeerConnection {
   static instances: FakePeerConnection[] = [];
   localDescription: RTCSessionDescriptionInit | null = null;
+  remoteDescription: RTCSessionDescriptionInit | null = null;
+  readonly receivedCandidates: RTCIceCandidateInit[] = [];
+  readonly addedTracks: { track: MediaStreamTrack; stream: MediaStream }[] = [];
+  iceConnectionState: RTCIceConnectionState = 'new';
+  signalingState: RTCSignalingState = 'stable';
+  onicecandidate: ((event: RTCPeerConnectionIceEvent) => void) | null = null;
+  oniceconnectionstatechange: (() => void) | null = null;
+  onsignalingstatechange: (() => void) | null = null;
+  ontrack: ((event: Pick<RTCTrackEvent, 'streams' | 'track'>) => void) | null = null;
   closed = false;
 
   constructor() {
     FakePeerConnection.instances.push(this);
   }
 
-  addTrack(): void {}
+  addTrack(track: MediaStreamTrack, stream: MediaStream): void {
+    this.addedTracks.push({ track, stream });
+  }
 
   createOffer(): Promise<RTCSessionDescriptionInit> {
     return Promise.resolve({ type: 'offer', sdp: 'v=0\r\n' });
@@ -80,12 +92,14 @@ export class FakePeerConnection {
     return Promise.resolve();
   }
 
-  setRemoteDescription(): Promise<void> {
+  setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
+    this.remoteDescription = description;
     return Promise.resolve();
   }
 
-  getTransceivers(): { stop(): void }[] {
-    return [];
+  addIceCandidate(candidate: RTCIceCandidateInit): Promise<void> {
+    this.receivedCandidates.push(candidate);
+    return Promise.resolve();
   }
 
   close(): void {
