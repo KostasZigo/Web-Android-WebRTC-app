@@ -46,23 +46,6 @@ module.exports = defineConfig([
     },
   },
   {
-    files: [
-      "src/app/chat/chat.component.ts",
-      "src/app/chat/service/data.service.ts",
-      "src/app/chat/types/message.ts",
-    ],
-    rules: {
-      "@typescript-eslint/no-explicit-any": "off",
-    },
-  },
-  {
-    files: ["src/app/chat/service/data.service.ts"],
-    rules: {
-      "@typescript-eslint/no-empty-function": "off",
-      "no-var": "off",
-    },
-  },
-  {
     files: ["src/app/testing/browser-fakes.ts"],
     rules: {
       "@typescript-eslint/no-empty-function": "off",

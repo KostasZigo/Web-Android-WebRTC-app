@@ -3,9 +3,12 @@ import {
   Component,
   ElementRef,
   ViewChild,
-  ChangeDetectionStrategy
+  ChangeDetectionStrategy,
+  OnDestroy
 } from '@angular/core';
+import { Subscription } from 'rxjs';
 import { DataService } from './service/data.service';
+import { IceCandidate, SessionDescription } from './types/message';
 
 const mediaConstraints = {
   audio: true,
@@ -24,7 +27,9 @@ const offerOptions = {
   changeDetection: ChangeDetectionStrategy.Eager,
   standalone: false
 })
-export class ChatComponent implements AfterViewInit {
+export class ChatComponent implements AfterViewInit, OnDestroy {
+  private readonly signalingSubscriptions = new Subscription();
+  private lastSignalingError?: string;
   private localStream!: MediaStream;
   @ViewChild('local_video') localVideo!: ElementRef;
   @ViewChild('received_video') remoteVideo!: ElementRef;
@@ -36,6 +41,11 @@ export class ChatComponent implements AfterViewInit {
   ngAfterViewInit(): void {
     this.addIncomingMessageHandling();
     this.requestMediaDevices();
+  }
+
+  ngOnDestroy(): void {
+    this.signalingSubscriptions.unsubscribe();
+    this.dataService.closeWebSocket();
   }
 
   private async requestMediaDevices(): Promise<void> {
@@ -60,7 +70,6 @@ export class ChatComponent implements AfterViewInit {
   }
 
   private createPeerConnection() {
-    //stun server , change to the one on android, also maybe change messages
     this.peerConnection = new RTCPeerConnection({
       iceServers: [
         {
@@ -103,17 +112,20 @@ export class ChatComponent implements AfterViewInit {
 
     try {
       const offer: RTCSessionDescriptionInit =
-        await this.peerConnection.createOffer(offerOptions); //offerOptions
+        await this.peerConnection.createOffer(offerOptions);
+      if (offer.type !== 'offer' || !offer.sdp) {
+        throw new Error('Could not create a valid offer');
+      }
       await this.peerConnection.setLocalDescription(offer);
 
       this.dataService.sendMessage({
         type: 'sdp',
-        data: offer,
-        sdp: offer?.sdp,
+        data: { type: 'offer', sdp: offer.sdp },
+        sdp: offer.sdp,
         candidate: '',
         id: '',
         label: '',
-      }); //'offer
+      });
     } catch (err) {
       this.handleGetUserMediaError(err);
     }
@@ -138,8 +150,7 @@ export class ChatComponent implements AfterViewInit {
   };
 
   private handleICECandidateEvent = (event: RTCPeerConnectionIceEvent) => {
-    console.log(event);
-    if (event.candidate) {
+    if (event.candidate?.candidate) {
       this.dataService.sendMessage({
         type: 'ice',
         data: event.candidate,
@@ -177,56 +188,43 @@ export class ChatComponent implements AfterViewInit {
   };
 
   private addIncomingMessageHandling(): void {
+    this.signalingSubscriptions.add(this.dataService.messages$.subscribe(msg => {
+      switch (msg.type) {
+        case 'offer':
+          this.handleOfferMessage(msg.description);
+          break;
+        case 'answer':
+          this.handleAnswerMessage(msg.description);
+          break;
+        case 'ice':
+          this.handleICECandidateMessage(msg.candidate);
+          break;
+        case 'peer-left':
+          this.handleHangupMessage();
+          break;
+        case 'matched':
+          this.lastSignalingError = undefined;
+          break;
+        case 'on-going-call':
+          alert('A call is already in progress. Try again later.');
+          this.dataService.closeWebSocket();
+          break;
+      }
+    }));
+    this.signalingSubscriptions.add(this.dataService.errors$.subscribe(error => {
+      console.error('Signaling error:', error);
+      if (this.lastSignalingError !== error.message) {
+        this.lastSignalingError = error.message;
+        alert(error.message);
+      }
+    }));
     this.dataService.connect();
-
-    this.dataService.messages$.subscribe(
-      (msg) => {
-        switch (msg.type) {
-          case 'sdp': //'offer':
-            console.log('11111111111111 ', msg);
-            console.log('3333333333 ', msg.data);
-            if (msg.data == undefined) {
-              msg.data = { type: 'offer', sdp: msg.sdp };
-              console.log('NAIIIII');
-            }
-            console.log('444444444444444 ', msg.data);
-            this.handleOfferMessage(msg.data); //msg.data
-            break;
-          case 'answer':
-            this.handleAnswerMessage(msg.data);
-            break;
-          case 'peer-left': //'hangup':
-            this.handleHangupMessage();
-            break;
-          case 'ice':
-            if (msg.data == undefined) {
-              msg.data = {
-                candidate: msg.candidate,
-                sdpMid: msg.id,
-                sdpMLineIndex: msg.label,
-              };
-              console.log('android ', msg.data);
-            }
-            //console.log('Got ice message : ', msg)
-            this.handleICECandidateMessage(msg.data);
-            break;
-          case 'matched':
-            console.log('got message type matched i dont care: ');
-            console.log(msg);
-            break;
-          default:
-            console.log('unknown message of type : ' + msg.type);
-        }
-      },
-      (error) => console.log(error)
-    );
   }
 
-  private handleOfferMessage(msg: RTCSessionDescriptionInit): void {
+  private handleOfferMessage(msg: SessionDescription): void {
     if (!this.peerConnection) {
       this.createPeerConnection();
-      console.log("I AM BORN");
-    }else{
+    } else {
       this.closeVideoCall();
     }
 
@@ -252,10 +250,14 @@ export class ChatComponent implements AfterViewInit {
         return this.peerConnection.setLocalDescription(answer);
       })
       .then(() => {
+        const description = this.peerConnection.localDescription;
+        if (!description || description.type !== 'answer' || !description.sdp) {
+          throw new Error('Could not create a valid answer');
+        }
         this.dataService.sendMessage({
           type: 'answer',
-          data: this.peerConnection.localDescription,
-          sdp: this.peerConnection.localDescription?.sdp,
+          data: { type: 'answer', sdp: description.sdp },
+          sdp: description.sdp,
           candidate: '',
           id: '',
           label: '',
@@ -264,18 +266,25 @@ export class ChatComponent implements AfterViewInit {
       .catch(this.handleGetUserMediaError);
   }
 
-  private handleAnswerMessage(data: any): void {
-    this.peerConnection.setRemoteDescription(data);
+  private handleAnswerMessage(description: SessionDescription): void {
+    if (!this.peerConnection) {
+      this.reportError(new Error('Received an answer before starting a call'));
+      return;
+    }
+    this.peerConnection.setRemoteDescription(description).catch(this.reportError);
   }
 
   private handleHangupMessage(): void {
-    this.closeVideoCall();
-   // window.location.reload(); //tha to bgalw , dexomai ena peer-left apo to kin pou den to katalabainw
-    this.dataService.closeWebSocket()
+    if (this.peerConnection) this.closeVideoCall();
+    this.dataService.closeWebSocket();
   }
 
-  private handleICECandidateMessage(data: any): void {
-    this.peerConnection.addIceCandidate(data).catch(this.reportError);
+  private handleICECandidateMessage(candidate: IceCandidate): void {
+    if (!this.peerConnection) {
+      this.reportError(new Error('Received ICE before starting a call'));
+      return;
+    }
+    this.peerConnection.addIceCandidate(candidate).catch(this.reportError);
   }
 
   private reportError = (e: Error) => {
@@ -293,7 +302,6 @@ export class ChatComponent implements AfterViewInit {
       label: '',
     });
     this.closeVideoCall();
-    this.dataService.connect()
-    //window.location.reload();
+    this.dataService.connect();
   }
 }
