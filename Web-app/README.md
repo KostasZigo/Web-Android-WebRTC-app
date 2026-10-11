@@ -40,7 +40,8 @@ fresh media. Permission and call errors appear below the videos; press
 ## Check changes
 
 Install Playwright's test browser once, then run the headless browser tests
-with coverage and the Angular/TypeScript lint rules:
+with coverage and the Angular/TypeScript lint rules (including end-to-end
+test files):
 
 ```powershell
 npx playwright install chromium
@@ -60,6 +61,20 @@ Vitest in headless Chromium and writes reports to `coverage\webTerra`;
 the current checks require at least 80% statement coverage and 65% branch
 coverage. The signaling and call tests now reach 82.13% branch coverage.
 
+For end-to-end checks, install the server's dependencies too, then run:
+
+```powershell
+npm --prefix ..\server ci
+npm run e2e
+```
+
+Playwright starts the web app on port 4200 and the real signaling server
+on port 8000, runs two headless Chromium callers with fake camera and
+microphone input, and stops both servers afterward. Stop any servers
+already using these ports before running the checks. No physical camera
+or phone is needed. Failure screenshots are kept under the ignored
+`coverage\playwright` directory.
+
 For a production build, choose a folder outside this repository because
 `dist` still contains tracked older build files:
 
@@ -71,5 +86,3 @@ With this output override, Angular places the browser files in the
 `browser` subfolder. Normal builds keep the old `dist\webTerra` asset path.
 The current build succeeds but warns that its initial bundle is 580.49 kB,
 above the existing 500 kB warning limit. The limit has not been raised.
-The old Protractor browser end-to-end tests still need their planned
-replacement.

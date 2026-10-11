@@ -120,18 +120,6 @@
             }
           }
         },
-        "e2e": {
-          "builder": "@angular-devkit/build-angular:protractor",
-          "options": {
-            "protractorConfig": "e2e/protractor.conf.js",
-            "devServerTarget": "webTerra:serve"
-          },
-          "configurations": {
-            "production": {
-              "devServerTarget": "webTerra:serve:production"
-            }
-          }
-        },
         "lint": {
           "builder": "@angular-eslint/builder:lint",
           "options": {
