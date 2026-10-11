@@ -1,17 +1,9 @@
-/* To learn more about this file see: https://angular.io/config/tsconfig. */
 {
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "outDir": "../out-tsc/e2e",
-    "module": "es2015", //"commonjs",
-    "target": "es2018",
-    "types": [
-      "jasmine",
-      "node"
-    ],
-    "lib": [
-      "es2018",
-      "dom"
-     ]
-  }
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["playwright.config.ts", "src/**/*.ts"]
 }
