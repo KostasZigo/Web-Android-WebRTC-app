@@ -13,7 +13,7 @@ enum class MessageType(val value: String) {
     MatchMessage("match"),
     PeerLeft("peer-left"),
     AnswerMessage("answer"),
-    OnGoingCall("on-going-call"); //egw
+    OnGoingCall("on-going-call");
     override fun toString() = value
 }
 
@@ -24,20 +24,19 @@ data class AnswerMessage(val sdp: String) : ClientMessage(MessageType.AnswerMess
 data class ICEMessage(val label: Int, val id: String, val candidate: String) : ClientMessage(MessageType.ICEMessage)
 data class MatchMessage(val match: String, val offer: Boolean) : ClientMessage(MessageType.MatchMessage)
 class PeerLeft : ClientMessage(MessageType.PeerLeft)
-class OnGoingCall : ClientMessage(MessageType.OnGoingCall)//egw
+class OnGoingCall : ClientMessage(MessageType.OnGoingCall)
 
 class SignalingWebSocket : WebSocketListener() {
 
     private var webSocket: WebSocket? = null
     var messageHandler: ((ClientMessage) -> Unit)? = null
 
-    override fun onOpen(webSocket: WebSocket?, response: Response?) {
+    override fun onOpen(webSocket: WebSocket, response: Response) {
         Log.i(TAG, "WebSocket: OPEN")
         this.webSocket = webSocket
     }
 
-    override fun onMessage(webSocket: WebSocket?, text: String?) {
-        Log.i(TAG, "WebSocket: Got message $text")
+    override fun onMessage(webSocket: WebSocket, text: String) {
         val json = JSONObject(text)
         val type = json.getString("type")
         val clientMessage =
@@ -45,16 +44,13 @@ class SignalingWebSocket : WebSocketListener() {
                     "sdp" ->
                         SDPMessage(json.getString("sdp"))
                     "ice" ->
-                        if(json.has("data")){ //web
-                            Log.i(TAG,"Exist!");
-                            val jsonData = JSONObject(json.getString("data"));
-                            Log.i(TAG, "ela $jsonData");
+                        if(json.has("data")){
+                            val jsonData = JSONObject(json.getString("data"))
                             ICEMessage(
                                     jsonData.getInt("sdpMLineIndex"),
                                     jsonData.getString("sdpMid"),
                                     jsonData.getString("candidate"))
                         }else {
-                            Log.i(TAG, "Doesn'tExist!");
                             ICEMessage(
                                     json.getInt("label"),
                                     json.getString("id"),
@@ -65,7 +61,7 @@ class SignalingWebSocket : WebSocketListener() {
                     "peer-left" ->
                         PeerLeft()
                     "on-going-call" ->
-                        OnGoingCall() //egw
+                        OnGoingCall()
                     "answer" ->
                         AnswerMessage(json.getString("sdp"))
                     else ->
@@ -75,15 +71,15 @@ class SignalingWebSocket : WebSocketListener() {
         if(clientMessage != null) this.messageHandler?.invoke(clientMessage)
     }
 
-    override fun onClosing(webSocket: WebSocket?, code: Int, reason: String?) {
+    override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
         Log.i(TAG, "WebSocket: closed")
         super.onClosing(webSocket, code, reason)
         this.webSocket = null
     }
 
-    override fun onFailure(webSocket: WebSocket?, t: Throwable?, response: Response?) {
+    override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
         super.onFailure(webSocket, t, response)
-        Log.e(TAG, "WebSocket: Failure($t)")
+        Log.e(TAG, "WebSocket connection failed", t)
     }
 
     private fun send(clientMessage: ClientMessage) {

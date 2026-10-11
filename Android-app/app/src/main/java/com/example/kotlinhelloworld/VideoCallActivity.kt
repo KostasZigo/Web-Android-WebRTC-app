@@ -1,8 +1,10 @@
 package com.example.kotlinhelloworld
 
+import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AlertDialog
@@ -22,6 +24,8 @@ class VideoCallActivity : AppCompatActivity() {
     private var savedMicrophoneState: Boolean? = null
     private var savedAudioMode: Int? = null
     private var exitNoticeShown = false
+    private val localNetworkRequired: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -64,15 +68,16 @@ class VideoCallActivity : AppCompatActivity() {
     }
 
     private fun handlePermissions() {
-        if (CallUiPolicy.requiredPermissions.all {
+        val permissions = CallUiPolicy.permissionsForCall(localNetworkRequired)
+        if (permissions.all {
                 ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
             }) {
             startVideoSession()
         } else {
             ActivityCompat.requestPermissions(
                 this,
-                CallUiPolicy.requiredPermissions.toTypedArray(),
-                CAMERA_AUDIO_PERMISSION_REQUEST
+                permissions.toTypedArray(),
+                CALL_PERMISSIONS_REQUEST
             )
         }
     }
@@ -109,11 +114,17 @@ class VideoCallActivity : AppCompatActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode != CAMERA_AUDIO_PERMISSION_REQUEST || isFinishing || isDestroyed) return
-        if (CallUiPolicy.hasCallPermissions(permissions, grantResults)) {
+        if (requestCode != CALL_PERMISSIONS_REQUEST || isFinishing || isDestroyed) return
+        val denied = CallUiPolicy.deniedPermissions(permissions, grantResults, localNetworkRequired)
+        if (denied.isEmpty()) {
             startVideoSession()
         } else {
-            showExitNotice(R.string.call_permission_required)
+            val message = if (Manifest.permission.ACCESS_LOCAL_NETWORK in denied) {
+                R.string.call_local_network_required
+            } else {
+                R.string.call_permission_required
+            }
+            showExitNotice(message)
         }
     }
 
@@ -128,7 +139,7 @@ class VideoCallActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val CAMERA_AUDIO_PERMISSION_REQUEST = 1
+        private const val CALL_PERMISSIONS_REQUEST = 1
         private const val TAG = "VideoCallActivity"
         private const val BACKEND_URL = "ws://192.168.1.4:8000/"
     }
