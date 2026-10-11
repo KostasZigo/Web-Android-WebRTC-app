@@ -1,17 +1,33 @@
 package com.example.kotlinhelloworld.videoCall
 
-import android.R.attr.data
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import com.example.kotlinhelloworld.R
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONException
-import org.json.JSONObject
-import org.webrtc.*
+import org.webrtc.AudioSource
+import org.webrtc.Camera1Enumerator
+import org.webrtc.Camera2Enumerator
+import org.webrtc.DataChannel
+import org.webrtc.DefaultVideoDecoderFactory
+import org.webrtc.DefaultVideoEncoderFactory
+import org.webrtc.EglBase
+import org.webrtc.IceCandidate
+import org.webrtc.MediaConstraints
+import org.webrtc.MediaStream
+import org.webrtc.PeerConnection
+import org.webrtc.PeerConnectionFactory
+import org.webrtc.RtpTransceiver
+import org.webrtc.SessionDescription
+import org.webrtc.SurfaceTextureHelper
+import org.webrtc.VideoCapturer
+import org.webrtc.VideoSink
+import org.webrtc.VideoSource
+import org.webrtc.VideoTrack
 import java.util.concurrent.Executors
 
+internal fun selectPreferredCamera(deviceNames: Array<String>, isFrontFacing: (String) -> Boolean): String? =
+    deviceNames.firstOrNull(isFrontFacing) ?: deviceNames.firstOrNull()
 
 enum class VideoCallStatus(val label: Int, val color: Int) {
     UNKNOWN(R.string.status_unknown, R.color.colorUnknown),
@@ -23,17 +39,7 @@ enum class VideoCallStatus(val label: Int, val color: Int) {
     ON_GOING_CALL(R.string.status_finished, R.color.colorConnected);
 }
 
-data class VideoRenderers(private val localView: SurfaceViewRenderer?, private val remoteView: SurfaceViewRenderer?) {
-    val localRenderer: (VideoRenderer.I420Frame) -> Unit =
-        if(localView == null) this::sink else { f -> localView.renderFrame(f) }
-    val remoteRenderer: (VideoRenderer.I420Frame) -> Unit =
-        if(remoteView == null) this::sink else { f -> remoteView.renderFrame(f) }
-
-    private fun sink(frame: VideoRenderer.I420Frame) {
-        Log.w("VideoRenderer", "Missing surface view, dropping frame")
-        VideoRenderer.renderFrameDone(frame)
-    }
-}
+data class VideoRenderers(val local: VideoSink, val remote: VideoSink)
 
 class VideoCallSession(
         private val context: Context,
@@ -48,25 +54,32 @@ class VideoCallSession(
     private var audioSource : AudioSource? = null
     private val eglBase = EglBase.create()
     private var videoCapturer: VideoCapturer? = null
+    private var surfaceTextureHelper: SurfaceTextureHelper? = null
+    private var localVideoTrack: VideoTrack? = null
+    private var remoteVideoTrack: VideoTrack? = null
 
     val renderContext: EglBase.Context
         get() = eglBase.eglBaseContext
 
     class SimpleRTCEventHandler(
             private val onIceCandidateCb: (IceCandidate) -> Unit,
-            private val onAddStreamCb: (MediaStream) -> Unit,
-            private val onRemoveStreamCb: (MediaStream) -> Unit) : PeerConnection.Observer {
+            private val onVideoTrackCb: (VideoTrack) -> Unit,
+            private val onRemoveStreamCb: () -> Unit) : PeerConnection.Observer {
 
         override fun onIceCandidate(candidate: IceCandidate?) {
             if(candidate != null) onIceCandidateCb(candidate)
         }
 
         override fun onAddStream(stream: MediaStream?) {
-            if (stream != null) onAddStreamCb(stream)
+            stream?.videoTracks?.firstOrNull()?.let(onVideoTrackCb)
         }
 
         override fun onRemoveStream(stream: MediaStream?) {
-            if(stream != null) onRemoveStreamCb(stream)
+            if (stream != null) onRemoveStreamCb()
+        }
+
+        override fun onTrack(transceiver: RtpTransceiver?) {
+            (transceiver?.receiver?.track() as? VideoTrack)?.let(onVideoTrackCb)
         }
 
         override fun onDataChannel(chan: DataChannel?) { Log.w(TAG, "onDataChannel: $chan") }
@@ -83,7 +96,6 @@ class VideoCallSession(
 
         override fun onRenegotiationNeeded() { Log.w(TAG, "onRenegotiationNeeded") }
 
-        override fun onAddTrack(receiver: RtpReceiver?, streams: Array<out MediaStream>?) { }
     }
 
     init {
@@ -93,27 +105,30 @@ class VideoCallSession(
     }
 
     private fun init() {
-        //PeerConnectionFactory.initializeAndroidGlobals(context, true)
-        val initializeOptions=PeerConnectionFactory.InitializationOptions.builder(context).setEnableVideoHwAcceleration(false).setEnableInternalTracer(false).createInitializationOptions()
-        PeerConnectionFactory.initialize(initializeOptions) //gialakias
+        val initializationOptions = PeerConnectionFactory.InitializationOptions.builder(context)
+            .setEnableInternalTracer(false)
+            .createInitializationOptions()
+        PeerConnectionFactory.initialize(initializationOptions)
 
-        val opts = PeerConnectionFactory.Options()
-        opts.networkIgnoreMask = 0
-
-        factory = PeerConnectionFactory.builder().setOptions(opts).createPeerConnectionFactory()
-        factory?.setVideoHwAccelerationOptions(eglBase.eglBaseContext, eglBase.eglBaseContext)
+        factory = PeerConnectionFactory.builder()
+            .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true))
+            .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
+            .createPeerConnectionFactory()
 
         val iceServers = arrayListOf(
                 PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
         )
 
-        val constraints = MediaConstraints()
-        constraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveAudio", "true"))
-        constraints.mandatory.add(MediaConstraints.KeyValuePair("OfferToReceiveVideo", "true"))
         val rtcCfg = PeerConnection.RTCConfiguration(iceServers)
         rtcCfg.continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
-        val rtcEvents = SimpleRTCEventHandler(this::handleLocalIceCandidate, this::addRemoteStream, this::removeRemoteStream)
-        peerConnection = factory?.createPeerConnection(rtcCfg, constraints, rtcEvents) //deprecated?
+        rtcCfg.sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
+        val rtcEvents = SimpleRTCEventHandler(this::handleLocalIceCandidate, this::attachRemoteVideoTrack, this::removeRemoteStream)
+        peerConnection = factory?.createPeerConnection(rtcCfg, rtcEvents)
+        if (peerConnection == null) {
+            Log.e(TAG, "Could not create peer connection")
+            onStatusChangedListener(VideoCallStatus.FAILED)
+            return
+        }
         setupMediaDevices()
     }
 
@@ -133,21 +148,18 @@ class VideoCallSession(
         signaler.sendCandidate(candidate.sdpMLineIndex, candidate.sdpMid, candidate.sdp)
     }
 
-    private fun addRemoteStream(stream: MediaStream) {
-        onStatusChangedListener(VideoCallStatus.CONNECTED)
-        Log.i(TAG, "Got remote stream: $stream")
+    private fun attachRemoteVideoTrack(track: VideoTrack) {
         executor.execute {
-            if(stream.videoTracks.isNotEmpty()) {
-                val remoteVideoTrack = stream.videoTracks.first()
-                remoteVideoTrack.setEnabled(true)
-                remoteVideoTrack.addRenderer(VideoRenderer(videoRenderers.remoteRenderer))
-            }
+            if (remoteVideoTrack === track) return@execute
+            remoteVideoTrack?.removeSink(videoRenderers.remote)
+            remoteVideoTrack = track
+            track.setEnabled(true)
+            track.addSink(videoRenderers.remote)
+            onStatusChangedListener(VideoCallStatus.CONNECTED)
         }
     }
 
-    private fun removeRemoteStream(@Suppress("UNUSED_PARAMETER") _stream: MediaStream) {
-        // We lost the stream, lets finish
-        Log.i(TAG, "Bye")
+    private fun removeRemoteStream() {
         onStatusChangedListener(VideoCallStatus.FINISHED)
     }
 
@@ -160,38 +172,59 @@ class VideoCallSession(
     }
 
     private fun setupMediaDevices() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            val camera2 = Camera2Enumerator(context)
-            if(camera2.deviceNames.isNotEmpty()) {
-                val selectedDevice = camera2.deviceNames.firstOrNull(camera2::isFrontFacing) ?: camera2.deviceNames.first()
-                videoCapturer = camera2.createCapturer(selectedDevice, null)
-            }
+        val capturer = createCameraCapturer()
+        if (capturer == null) {
+            Log.e(TAG, "No camera available for the call")
+            onStatusChangedListener(VideoCallStatus.FAILED)
+            return
         }
-        if(videoCapturer == null) {
-            val camera1 = Camera1Enumerator(true)
-            val selectedDevice = camera1.deviceNames.firstOrNull(camera1::isFrontFacing) ?: camera1.deviceNames.first()
-            videoCapturer = camera1.createCapturer(selectedDevice, null)
+        videoCapturer = capturer
+        val source = factory?.createVideoSource(capturer.isScreencast)
+        if (source == null) {
+            Log.e(TAG, "Could not create video source")
+            onStatusChangedListener(VideoCallStatus.FAILED)
+            return
         }
+        videoSource = source
+        val helper = SurfaceTextureHelper.create("CaptureThread", eglBase.eglBaseContext)
+        surfaceTextureHelper = helper
+        capturer.initialize(helper, context, source.capturerObserver)
+        capturer.startCapture(640, 480, 24)
 
+        val videoTrack = factory?.createVideoTrack(VIDEO_TRACK_LABEL, source)
+        if (videoTrack == null) {
+            Log.e(TAG, "Could not create video track")
+            onStatusChangedListener(VideoCallStatus.FAILED)
+            return
+        }
+        localVideoTrack = videoTrack
+        videoTrack.addSink(videoRenderers.local)
 
-        videoSource = factory?.createVideoSource(videoCapturer)
+        val microphoneSource = factory?.createAudioSource(createAudioConstraints())
+        if (microphoneSource == null) {
+            Log.e(TAG, "Could not create microphone source")
+            onStatusChangedListener(VideoCallStatus.FAILED)
+            return
+        }
+        audioSource = microphoneSource
+        val audioTrack = factory?.createAudioTrack(AUDIO_TRACK_LABEL, microphoneSource)
+        if (audioTrack == null || peerConnection?.addTrack(videoTrack, listOf(STREAM_LABEL)) == null ||
+            peerConnection?.addTrack(audioTrack, listOf(STREAM_LABEL)) == null) {
+            Log.e(TAG, "Could not add camera and microphone to the call")
+            onStatusChangedListener(VideoCallStatus.FAILED)
+        }
+    }
 
-        videoCapturer?.startCapture(640, 480, 24)
-
-        val stream = factory?.createLocalMediaStream(STREAM_LABEL)
-        val videoTrack = factory?.createVideoTrack(VIDEO_TRACK_LABEL, videoSource)
-
-        val videoRenderer = VideoRenderer(videoRenderers.localRenderer)
-        videoTrack?.addRenderer(videoRenderer)
-        stream?.addTrack(videoTrack)
-
-        audioSource = factory?.createAudioSource(createAudioConstraints())
-        val audioTrack = factory?.createAudioTrack(AUDIO_TRACK_LABEL, audioSource)
-
-        stream?.addTrack(audioTrack)
-
-        peerConnection?.addStream(stream)
+    private fun createCameraCapturer(): VideoCapturer? {
+        val cameras = listOfNotNull(
+            if (Camera2Enumerator.isSupported(context)) Camera2Enumerator(context) else null,
+            Camera1Enumerator(true)
+        )
+        for (camera in cameras) {
+            val device = selectPreferredCamera(camera.deviceNames, camera::isFrontFacing) ?: continue
+            camera.createCapturer(device, null)?.let { return it }
+        }
+        return null
     }
 
     private fun createAudioConstraints(): MediaConstraints {
@@ -204,7 +237,6 @@ class VideoCallSession(
     }
 
     private fun handleRemoteDescriptor(sdp: String) {
-        Log.e(TAG, "Error egw: $sdp")
         if(isOfferingPeer) {
             peerConnection?.setRemoteDescription(SDPSetCallback({ setError ->
                 if (setError != null) {
@@ -215,13 +247,12 @@ class VideoCallSession(
             peerConnection?.setRemoteDescription(SDPSetCallback({ setError ->
                 if (setError != null) {
                     Log.e(TAG, "Receiving offer setRemoteDescription failed: $setError")
-                    Log.i(TAG, "EDWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW")
                     isOfferingPeer = true
                     start()
                 } else {
                     peerConnection?.createAnswer(SDPCreateCallback(this::createDescriptorCallback), MediaConstraints())
                 }
-            }), SessionDescription(SessionDescription.Type.OFFER, sdp.toString()))
+            }), SessionDescription(SessionDescription.Type.OFFER, sdp))
         }
     }
 
@@ -257,7 +288,7 @@ class VideoCallSession(
             is PeerLeft -> {
                 onStatusChangedListener(VideoCallStatus.FINISHED)
             }
-            is OnGoingCall -> { //egw
+            is OnGoingCall -> {
                 onStatusChangedListener(VideoCallStatus.ON_GOING_CALL)
             }
         }
@@ -267,9 +298,15 @@ class VideoCallSession(
         signaler.close()
         try {
             videoCapturer?.stopCapture()
-        } catch (ex: Exception) { }
+        } catch (interrupted: InterruptedException) {
+            Log.e(TAG, "Camera stop interrupted", interrupted)
+            Thread.currentThread().interrupt()
+        }
 
+        localVideoTrack?.removeSink(videoRenderers.local)
+        remoteVideoTrack?.removeSink(videoRenderers.remote)
         videoCapturer?.dispose()
+        surfaceTextureHelper?.dispose()
         videoSource?.dispose()
 
         audioSource?.dispose()
@@ -291,7 +328,7 @@ class VideoCallSession(
             val request = Request.Builder().url(url).build()
             Log.i(TAG, "Connecting to $url")
             client.newWebSocket(request, websocketHandler)
-            client.dispatcher().executorService().shutdown()
+            client.dispatcher.executorService.shutdown()
             return session
         }
 

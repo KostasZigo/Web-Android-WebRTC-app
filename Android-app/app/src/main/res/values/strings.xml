@@ -10,5 +10,6 @@
     <string name="call_finished_message">The other person left the call. Return to Connect to start another call.</string>
     <string name="call_busy_message">Another pair is already in a call. Try again in a moment.</string>
     <string name="call_permission_required">Allow camera and microphone access to make a call. You can enable them in Settings and try again.</string>
+    <string name="call_local_network_required">Allow nearby devices access to connect to calls on your local network. You can enable it in Settings and try again.</string>
     <string name="hang_up">Hang up</string>
 </resources>
