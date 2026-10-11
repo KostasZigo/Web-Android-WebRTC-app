@@ -1,110 +1,81 @@
 package com.example.kotlinhelloworld.videoCall
 
-
 import android.util.Log
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
-import org.json.JSONObject
-
-enum class MessageType(val value: String) {
-    SDPMessage("sdp"),
-    ICEMessage("ice"),
-    MatchMessage("match"),
-    PeerLeft("peer-left"),
-    AnswerMessage("answer"),
-    OnGoingCall("on-going-call");
-    override fun toString() = value
-}
-
-open class ClientMessage(val type: MessageType)
-
-data class SDPMessage(val sdp: String) : ClientMessage(MessageType.SDPMessage)
-data class AnswerMessage(val sdp: String) : ClientMessage(MessageType.AnswerMessage)
-data class ICEMessage(val label: Int, val id: String, val candidate: String) : ClientMessage(MessageType.ICEMessage)
-data class MatchMessage(val match: String, val offer: Boolean) : ClientMessage(MessageType.MatchMessage)
-class PeerLeft : ClientMessage(MessageType.PeerLeft)
-class OnGoingCall : ClientMessage(MessageType.OnGoingCall)
+import java.io.IOException
 
 class SignalingWebSocket : WebSocketListener() {
+    @Volatile private var webSocket: WebSocket? = null
+    @Volatile private var closing = false
 
-    private var webSocket: WebSocket? = null
     var messageHandler: ((ClientMessage) -> Unit)? = null
+    var errorHandler: ((Throwable) -> Unit)? = null
 
+    @Synchronized
     override fun onOpen(webSocket: WebSocket, response: Response) {
-        Log.i(TAG, "WebSocket: OPEN")
-        this.webSocket = webSocket
+        if (closing) {
+            webSocket.close(1000, null)
+        } else {
+            this.webSocket = webSocket
+        }
     }
 
     override fun onMessage(webSocket: WebSocket, text: String) {
-        val json = JSONObject(text)
-        val type = json.getString("type")
-        val clientMessage =
-                when(type) {
-                    "sdp" ->
-                        SDPMessage(json.getString("sdp"))
-                    "ice" ->
-                        if(json.has("data")){
-                            val jsonData = JSONObject(json.getString("data"))
-                            ICEMessage(
-                                    jsonData.getInt("sdpMLineIndex"),
-                                    jsonData.getString("sdpMid"),
-                                    jsonData.getString("candidate"))
-                        }else {
-                            ICEMessage(
-                                    json.getInt("label"),
-                                    json.getString("id"),
-                                    json.getString("candidate"))
-                        }
-                    "matched" ->
-                        MatchMessage(json.getString("match"), json.getBoolean("offer"))
-                    "peer-left" ->
-                        PeerLeft()
-                    "on-going-call" ->
-                        OnGoingCall()
-                    "answer" ->
-                        AnswerMessage(json.getString("sdp"))
-                    else ->
-                        null
-                }
-        Log.i(TAG, "WebSocket: Decoded message as $clientMessage")
-        if(clientMessage != null) this.messageHandler?.invoke(clientMessage)
+        if (closing) return
+        val message = try {
+            SignalingCodec.decode(text)
+        } catch (invalid: InvalidSignalingMessage) {
+            reportError(invalid)
+            return
+        }
+        val handler = messageHandler
+        if (handler == null) {
+            reportError(IllegalStateException("No signaling message handler is attached"))
+        } else {
+            handler(message)
+        }
     }
 
+    @Synchronized
     override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
-        Log.i(TAG, "WebSocket: closed")
-        super.onClosing(webSocket, code, reason)
+        val unexpected = !closing
+        closing = true
+        this.webSocket = null
+        if (unexpected) reportError(IOException("Signaling connection closed ($code): $reason"))
+        webSocket.close(code, null)
+    }
+
+    override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
         this.webSocket = null
     }
 
+    @Synchronized
     override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-        super.onFailure(webSocket, t, response)
-        Log.e(TAG, "WebSocket connection failed", t)
+        val unexpected = !closing
+        closing = true
+        this.webSocket = null
+        if (unexpected) reportError(t)
     }
 
-    private fun send(clientMessage: ClientMessage) {
-        val json = JSONObject()
-        json.put("type", clientMessage.type)
-        when(clientMessage) {
-            is SDPMessage -> {
-                json.put("sdp", clientMessage.sdp)
-            }
-            is ICEMessage -> {
-                json.put("candidate", clientMessage.candidate)
-                json.put("id", clientMessage.id)
-                json.put("label", clientMessage.label)
-            }
-            else -> {
-                Log.w(TAG, "Message of type '${clientMessage.type.value}' can't be sent to the server")
-                return
-            }
+    private fun send(message: ClientMessage) {
+        val payload = try {
+            SignalingCodec.encode(message)
+        } catch (invalid: InvalidSignalingMessage) {
+            reportError(invalid)
+            return
         }
-        Log.i(TAG, "WebSocket: Sending $json")
-        webSocket?.send(json.toString())
+        if (webSocket?.send(payload) != true) {
+            reportError(IOException("Signaling connection is not open"))
+        }
     }
 
+    @Synchronized
     fun close() {
+        closing = true
         webSocket?.close(1000, null)
+        webSocket = null
     }
 
     fun sendSDP(sdp: String) {
@@ -115,7 +86,12 @@ class SignalingWebSocket : WebSocketListener() {
         send(ICEMessage(label, id, candidate))
     }
 
-    companion object {
-        private val TAG = "SignalingWebSocket"
+    private fun reportError(error: Throwable) {
+        val handler = errorHandler
+        if (handler == null) Log.e(TAG, "Signaling failed", error) else handler(error)
+    }
+
+    private companion object {
+        const val TAG = "SignalingWebSocket"
     }
 }
