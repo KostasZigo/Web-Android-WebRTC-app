@@ -1,10 +1,14 @@
 <resources>
     <string name="app_name">KotlinHelloWorld</string>
-    <string name="status_unknown">Unknown</string>
-    <string name="status_connecting">Connecting …</string>
-    <string name="status_connected">Connected!</string>
-    <string name="status_matching">Matching …</string>
-    <string name="status_failed">Failed</string>
+    <string name="status_unknown">Waiting to connect</string>
+    <string name="status_connecting">Connecting to the other person…</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_matching">Waiting for another person…</string>
+    <string name="status_failed">Call failed. Hang up and try again.</string>
     <string name="connect_btn">Connect</string>
-    <string name="status_finished">Finished</string>
+    <string name="status_finished">Call ended</string>
+    <string name="call_finished_message">The other person left the call. Return to Connect to start another call.</string>
+    <string name="call_busy_message">Another pair is already in a call. Try again in a moment.</string>
+    <string name="call_permission_required">Allow camera and microphone access to make a call. You can enable them in Settings and try again.</string>
+    <string name="hang_up">Hang up</string>
 </resources>
