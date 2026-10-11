@@ -8,6 +8,9 @@
         <video #received_video [autoplay]="true"></video>
     </mat-grid-tile>
 </mat-grid-list>
+@if (errorMessage) {
+    <p role="alert">{{ errorMessage }}</p>
+}
 <button mat-raised-button color="primary" (click)="startLocalVideo()">Start</button>
 <button mat-raised-button color="primary" (click)="pauseLocalVideo()">Stop</button>
 <button mat-raised-button color="primary" (click)="call()">Call</button>

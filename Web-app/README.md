@@ -28,6 +28,15 @@ providers: [{ provide: SIGNALING_URL, useValue: 'ws://192.168.1.10:8000/' }]
 
 Use `wss://` for HTTPS deployments. Invalid URL schemes are rejected.
 
+The page requests camera and microphone access when it opens. **Start**
+enables the local tracks and preview; **Stop** pauses them without closing
+the devices. The caller chosen to offer presses **Call** after matching;
+the waiting caller answers incoming offers automatically. **Hangup**
+ends the call and releases the camera and microphone. The browser reconnects
+after a hang-up or when the other caller leaves, so a later call requests
+fresh media. Permission and call errors appear below the videos; press
+**Start** again after granting permission in your browser.
+
 ## Check changes
 
 Install Playwright's test browser once, then run the headless browser tests
@@ -49,7 +58,7 @@ If you already have Chrome installed, you can set `CHROME_BIN` to its
 executable path instead of downloading Chromium. The test command runs
 Vitest in headless Chromium and writes reports to `coverage\webTerra`;
 the current checks require at least 80% statement coverage and 65% branch
-coverage. The signaling tests bring branch coverage to 82.03%.
+coverage. The signaling and call tests now reach 82.13% branch coverage.
 
 For a production build, choose a folder outside this repository because
 `dist` still contains tracked older build files:
@@ -60,7 +69,7 @@ npm run build -- --configuration production --output-path "$env:TEMP\webrtc-web-
 
 With this output override, Angular places the browser files in the
 `browser` subfolder. Normal builds keep the old `dist\webTerra` asset path.
-The current build succeeds but warns that its initial bundle is 577.14 kB,
+The current build succeeds but warns that its initial bundle is 580.49 kB,
 above the existing 500 kB warning limit. The limit has not been raised.
 The old Protractor browser end-to-end tests still need their planned
 replacement.

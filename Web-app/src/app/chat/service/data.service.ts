@@ -16,13 +16,16 @@ export class DataService {
   private readonly url = inject(SIGNALING_URL);
   private readonly messages = new Subject<IncomingMessage>();
   private readonly errors = new Subject<Error>();
+  private readonly disconnected = new Subject<void>();
   readonly messages$ = this.messages.asObservable();
   readonly errors$ = this.errors.asObservable();
+  readonly disconnected$ = this.disconnected.asObservable();
 
   private socket?: WebSocketSubject<unknown>;
   private socketSubscription?: Subscription;
   private retryTimer?: ReturnType<typeof setTimeout>;
   private intentionallyClosed = false;
+  private hangingUp = false;
   private connected = false;
   private offerer?: boolean;
   private awaitingAnswer = false;
@@ -51,7 +54,9 @@ export class DataService {
       closeObserver: {
         next: event => this.onDisconnected(
           socket,
-          new Error(`Signaling connection closed (${event.code}${event.reason ? `: ${event.reason}` : ''})`)
+          this.hangingUp && event.code === 1000
+            ? undefined
+            : new Error(`Signaling connection closed (${event.code}${event.reason ? `: ${event.reason}` : ''})`)
         )
       }
     });
@@ -85,6 +90,7 @@ export class DataService {
 
     this.socket.next(message);
     if (message.type === 'sdp') this.awaitingAnswer = true;
+    if (message.type === 'peer-left') this.hangingUp = true;
   }
 
   closeWebSocket(): void {
@@ -97,6 +103,7 @@ export class DataService {
     this.connected = false;
     this.offerer = undefined;
     this.awaitingAnswer = false;
+    this.hangingUp = false;
     this.socketSubscription?.unsubscribe();
     this.socketSubscription = undefined;
   }
@@ -122,10 +129,12 @@ export class DataService {
     this.connected = false;
     this.offerer = undefined;
     this.awaitingAnswer = false;
+    this.hangingUp = false;
     this.socketSubscription?.unsubscribe();
     this.socketSubscription = undefined;
 
     if (this.intentionallyClosed) return;
+    this.disconnected.next();
     if (error) {
       console.error('Signaling connection failed:', error);
       this.errors.next(error);

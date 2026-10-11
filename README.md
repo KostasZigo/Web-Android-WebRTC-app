@@ -68,9 +68,13 @@ The message names and examples shared by both clients are in
 
 #### Web Usage
  1. Enter localhost:4200 from your browser to connect to the application.
- 2. In order to open your camera press the ***Start*** button and to close it press the ***Stop*** button.
- 3. Press the ***Call*** button to start the communication with the first available user.
- 4. Press the ***Hangup*** button to stop the communication.
+ 2. Press ***Start*** to enable your camera and microphone; ***Stop*** pauses
+    their tracks without releasing the devices.
+ 3. Once matched, the offering caller presses ***Call***. The waiting caller
+    answers automatically. Connection and permission errors appear below
+    the videos.
+ 4. Press ***Hangup*** to end the call and release your camera and microphone.
+    Use ***Start*** or ***Call*** to request them again.
 
 ## Reference
 
