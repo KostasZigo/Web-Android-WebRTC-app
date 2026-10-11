@@ -1,154 +1,135 @@
 package com.example.kotlinhelloworld
 
 import android.content.Context
-import androidx.appcompat.app.AppCompatActivity
 import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Bundle
-//import android.support.v4.app.ActivityCompat
-//import android.support.v4.content.ContextCompat
 import android.util.Log
-import android.widget.ImageButton
-import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import org.webrtc.RendererCommon
-import org.webrtc.SurfaceViewRenderer
-import android.Manifest
-import android.widget.Toast
+import com.example.kotlinhelloworld.databinding.ActivityVideoCallBinding
 import com.example.kotlinhelloworld.videoCall.VideoCallSession
 import com.example.kotlinhelloworld.videoCall.VideoCallStatus
 import com.example.kotlinhelloworld.videoCall.VideoRenderers
-import androidx.appcompat.app.AlertDialog
+import org.webrtc.RendererCommon
 
 class VideoCallActivity : AppCompatActivity() {
-
-    private var videoSession : VideoCallSession? = null
-    private var statusTextView: TextView? = null
-    private var localVideoView: SurfaceViewRenderer? = null
-    private var remoteVideoView: SurfaceViewRenderer? = null
+    private lateinit var binding: ActivityVideoCallBinding
+    private var videoSession: VideoCallSession? = null
     private var audioManager: AudioManager? = null
-    private var savedMicrophoneState : Boolean? = null
+    private var savedMicrophoneState: Boolean? = null
     private var savedAudioMode: Int? = null
+    private var exitNoticeShown = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_video_call)
-        statusTextView = findViewById(R.id.status_text)
-        localVideoView = findViewById(R.id.pip_video)
-        remoteVideoView = findViewById(R.id.remote_video)
-
-        val hangup : ImageButton = findViewById(R.id.hangup_button)
-        hangup.setOnClickListener {
+        binding = ActivityVideoCallBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        binding.hangupButton.setOnClickListener {
             finish()
         }
-
-        audioManager = this.getSystemService(Context.AUDIO_SERVICE) as AudioManager?
-        savedAudioMode = audioManager?.mode
-        audioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
-
-        savedMicrophoneState = audioManager?.isMicrophoneMute
-        audioManager?.isMicrophoneMute = false
 
         handlePermissions()
     }
 
-
     override fun onDestroy() {
-        super.onDestroy()
-
-        videoSession?.terminate()
-        localVideoView?.release()
-        remoteVideoView?.release()
-
-        if(savedAudioMode !== null) {
-            audioManager?.mode = savedAudioMode!!
-        }
-        if(savedMicrophoneState != null) {
-            audioManager?.isMicrophoneMute = savedMicrophoneState!!
+        try {
+            videoSession?.terminate()
+            videoSession = null
+            binding.pipVideo.release()
+            binding.remoteVideo.release()
+        } finally {
+            audioManager?.let { manager ->
+                savedAudioMode?.let { manager.mode = it }
+                savedMicrophoneState?.let { manager.isMicrophoneMute = it }
+            }
+            super.onDestroy()
         }
     }
 
     private fun onStatusChanged(newStatus: VideoCallStatus) {
-        Log.d(TAG,"New call status: $newStatus")
+        Log.d(TAG, "New call status: $newStatus")
         runOnUiThread {
-            when(newStatus) {
-
-                VideoCallStatus.FINISHED ->{
-                    val builder = AlertDialog.Builder(this)
-                    builder.setTitle("App finished")
-                    builder.setMessage("Peer goes brrrrt")
-                    builder.setPositiveButton("YES"){dialog, which ->
-                        Toast.makeText(applicationContext,"Ok, you are out.",Toast.LENGTH_SHORT).show()
-                        finish()
-                    }
-                    val dialog: AlertDialog = builder.create()
-                    dialog.show()
-
-                }
-                VideoCallStatus.ON_GOING_CALL ->{
-                    val builder = AlertDialog.Builder(this)
-                    builder.setTitle("Club members only pleb")
-                    builder.setMessage("Can't you see that we are talking? GET OUT ! ")
-                    builder.setPositiveButton("YES"){dialog, which ->
-                        Toast.makeText(applicationContext,"Amumu sad noises",Toast.LENGTH_SHORT).show()
-                        finish()
-                    }
-                    val dialog: AlertDialog = builder.create()
-                    dialog.show()
-
-                }
-                else -> {
-                    statusTextView?.text = resources.getString(newStatus.label)
-                    statusTextView?.setTextColor(ContextCompat.getColor(this, newStatus.color))
-                }
+            if (isFinishing || isDestroyed || exitNoticeShown) return@runOnUiThread
+            val notice = CallUiPolicy.noticeFor(newStatus)
+            if (notice != null) {
+                showExitNotice(notice)
+            } else {
+                binding.statusText.setText(newStatus.label)
+                binding.statusText.setTextColor(ContextCompat.getColor(this, newStatus.color))
             }
         }
     }
 
-
     private fun handlePermissions() {
-        val canAccessCamera = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
-        val canRecordAudio  = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
-        if(!canAccessCamera || !canRecordAudio) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO), CAMERA_AUDIO_PERMISSION_REQUEST)
-        } else {
+        if (CallUiPolicy.requiredPermissions.all {
+                ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+            }) {
             startVideoSession()
+        } else {
+            ActivityCompat.requestPermissions(
+                this,
+                CallUiPolicy.requiredPermissions.toTypedArray(),
+                CAMERA_AUDIO_PERMISSION_REQUEST
+            )
         }
     }
 
     private fun startVideoSession() {
-        videoSession = VideoCallSession.connect(this, BACKEND_URL, VideoRenderers(localVideoView, remoteVideoView), this::onStatusChanged)
+        if (videoSession != null || isFinishing || isDestroyed) return
+        val manager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        audioManager = manager
+        savedAudioMode = manager.mode
+        savedMicrophoneState = manager.isMicrophoneMute
+        manager.mode = AudioManager.MODE_IN_COMMUNICATION
+        manager.isMicrophoneMute = false
 
-        localVideoView?.init(videoSession?.renderContext, null)
-        localVideoView?.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
-        localVideoView?.setZOrderMediaOverlay(true)
-        localVideoView?.setEnableHardwareScaler(true)
+        val session = VideoCallSession.connect(
+            this,
+            BACKEND_URL,
+            VideoRenderers(binding.pipVideo, binding.remoteVideo),
+            this::onStatusChanged
+        )
+        videoSession = session
 
-        remoteVideoView?.init(videoSession?.renderContext, null)
-        remoteVideoView?.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
-        remoteVideoView?.setEnableHardwareScaler(true)
-    }
-
-
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        Log.w(TAG, "onRequestPermissionsResult: $requestCode $permissions $grantResults")
-        when (requestCode) {
-            CAMERA_AUDIO_PERMISSION_REQUEST -> {
-                if (grantResults.isNotEmpty() && grantResults.first() == PackageManager.PERMISSION_GRANTED) {
-                    startVideoSession()
-                } else {
-                    finish()
-                }
-                return
-            }
+        binding.pipVideo.apply {
+            init(session.renderContext, null)
+            setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+            setZOrderMediaOverlay(true)
+            setEnableHardwareScaler(true)
+        }
+        binding.remoteVideo.apply {
+            init(session.renderContext, null)
+            setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
+            setEnableHardwareScaler(true)
         }
     }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != CAMERA_AUDIO_PERMISSION_REQUEST || isFinishing || isDestroyed) return
+        if (CallUiPolicy.hasCallPermissions(permissions, grantResults)) {
+            startVideoSession()
+        } else {
+            showExitNotice(R.string.call_permission_required)
+        }
+    }
+
+    private fun showExitNotice(message: Int) {
+        if (exitNoticeShown || isFinishing || isDestroyed) return
+        exitNoticeShown = true
+        AlertDialog.Builder(this)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok) { _, _ -> finish() }
+            .setOnCancelListener { finish() }
+            .show()
+    }
+
     companion object {
-        private val CAMERA_AUDIO_PERMISSION_REQUEST = 1
-        private val TAG = "VideoCallActivity"
-        private val BACKEND_URL = "ws://192.168.1.4:8000/"
-        //private val BACKEND_URL = "ws://HOST:8000/" // Change HOST to your server's IP if you want to test
+        private const val CAMERA_AUDIO_PERMISSION_REQUEST = 1
+        private const val TAG = "VideoCallActivity"
+        private const val BACKEND_URL = "ws://192.168.1.4:8000/"
     }
 }

@@ -47,7 +47,7 @@
             android:layout_marginStart="16dp"
             android:layout_marginBottom="36dp"
             android:background="@drawable/round_red_button"
-            android:contentDescription="TODO"
+            android:contentDescription="@string/hang_up"
             android:padding="8dp"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
