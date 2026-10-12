@@ -8,13 +8,21 @@ import java.io.IOException
 
 class SignalingWebSocket : WebSocketListener() {
     @Volatile private var webSocket: WebSocket? = null
+    private var pendingWebSocket: WebSocket? = null
     @Volatile private var closing = false
 
     var messageHandler: ((ClientMessage) -> Unit)? = null
     var errorHandler: ((Throwable) -> Unit)? = null
 
     @Synchronized
+    fun track(webSocket: WebSocket) {
+        if (closing) webSocket.cancel()
+        else if (this.webSocket !== webSocket) pendingWebSocket = webSocket
+    }
+
+    @Synchronized
     override fun onOpen(webSocket: WebSocket, response: Response) {
+        pendingWebSocket = null
         if (closing) {
             webSocket.close(1000, null)
         } else {
@@ -43,12 +51,15 @@ class SignalingWebSocket : WebSocketListener() {
         val unexpected = !closing
         closing = true
         this.webSocket = null
+        pendingWebSocket = null
         if (unexpected) reportError(IOException("Signaling connection closed ($code): $reason"))
         webSocket.close(code, null)
     }
 
+    @Synchronized
     override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
         this.webSocket = null
+        pendingWebSocket = null
     }
 
     @Synchronized
@@ -56,6 +67,7 @@ class SignalingWebSocket : WebSocketListener() {
         val unexpected = !closing
         closing = true
         this.webSocket = null
+        pendingWebSocket = null
         if (unexpected) reportError(t)
     }
 
@@ -74,8 +86,11 @@ class SignalingWebSocket : WebSocketListener() {
     @Synchronized
     fun close() {
         closing = true
-        webSocket?.close(1000, null)
+        val opened = webSocket
+        val pending = pendingWebSocket
         webSocket = null
+        pendingWebSocket = null
+        if (opened != null) opened.close(1000, null) else pending?.cancel()
     }
 
     fun sendSDP(sdp: String) {
