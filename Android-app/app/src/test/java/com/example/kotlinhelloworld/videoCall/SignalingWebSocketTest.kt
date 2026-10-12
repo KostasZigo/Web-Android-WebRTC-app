@@ -16,6 +16,7 @@ class SignalingWebSocketTest {
         val sent = mutableListOf<String>()
         var canSend = true
         var closedWith: Int? = null
+        var cancelled = false
         private val handshake = Request.Builder().url("https://example.test/").build()
 
         override fun request(): Request = handshake
@@ -29,7 +30,7 @@ class SignalingWebSocketTest {
             closedWith = code
             return true
         }
-        override fun cancel() = Unit
+        override fun cancel() { cancelled = true }
     }
 
     private fun response(socket: WebSocket): Response =
@@ -95,6 +96,25 @@ class SignalingWebSocketTest {
         signaler.onMessage(socket, """{"type":"peer-left"}""")
 
         assertEquals("No signaling message handler is attached", errors.single().message)
+    }
+
+    @Test
+    fun `hangup cancels a pending handshake and closes late connections`() {
+        val pending = RecordingSocket()
+        val signaler = SignalingWebSocket()
+        val errors = mutableListOf<Throwable>()
+        signaler.errorHandler = { errors.add(it) }
+
+        signaler.track(pending)
+        signaler.close()
+        signaler.onFailure(pending, IOException("cancelled"), null)
+
+        assertTrue(pending.cancelled)
+        assertTrue(errors.isEmpty())
+
+        val late = RecordingSocket()
+        signaler.onOpen(late, response(late))
+        assertEquals(1000, late.closedWith)
     }
 
     @Test

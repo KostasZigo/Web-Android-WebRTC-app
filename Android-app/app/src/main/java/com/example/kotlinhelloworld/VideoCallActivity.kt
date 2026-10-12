@@ -39,17 +39,28 @@ class VideoCallActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        val session = videoSession
+        videoSession = null
         try {
-            videoSession?.terminate()
-            videoSession = null
-            binding.pipVideo.release()
-            binding.remoteVideo.release()
+            if (session == null) releaseCallUi()
+            else session.terminate { runOnUiThread(::releaseCallUi) }
         } finally {
-            audioManager?.let { manager ->
-                savedAudioMode?.let { manager.mode = it }
-                savedMicrophoneState?.let { manager.isMicrophoneMute = it }
-            }
             super.onDestroy()
+        }
+    }
+
+    private fun releaseCallUi() {
+        try {
+            binding.pipVideo.release()
+        } finally {
+            try {
+                binding.remoteVideo.release()
+            } finally {
+                audioManager?.let { manager ->
+                    savedAudioMode?.let { manager.mode = it }
+                    savedMicrophoneState?.let { manager.isMicrophoneMute = it }
+                }
+            }
         }
     }
 
@@ -91,7 +102,7 @@ class VideoCallActivity : AppCompatActivity() {
         manager.mode = AudioManager.MODE_IN_COMMUNICATION
         manager.isMicrophoneMute = false
 
-        val session = VideoCallSession.connect(
+        val session = VideoCallSession.create(
             this,
             BACKEND_URL,
             VideoRenderers(binding.pipVideo, binding.remoteVideo),
@@ -110,6 +121,7 @@ class VideoCallActivity : AppCompatActivity() {
             setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FILL)
             setEnableHardwareScaler(true)
         }
+        session.start()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {

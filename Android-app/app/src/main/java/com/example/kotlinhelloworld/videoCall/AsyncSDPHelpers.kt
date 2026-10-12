@@ -22,7 +22,7 @@ class SDPCreateCallback(private val callback: (SDPCreateResult) -> Unit) : SdpOb
 
 class SDPSetCallback(private val callback: (String?) -> Unit) : SdpObserver {
 
-    override fun onSetFailure(reason: String?) = callback(reason)
+    override fun onSetFailure(reason: String?) = callback(reason ?: "Unknown SDP error")
 
     override fun onSetSuccess() = callback(null)
 
