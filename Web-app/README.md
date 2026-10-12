@@ -69,7 +69,7 @@ If you already have Chrome installed, you can set `CHROME_BIN` to its
 executable path instead of downloading Chromium. The test command runs
 Vitest in headless Chromium and writes reports to `coverage\webTerra`;
 the current checks require at least 80% statement coverage and 65% branch
-coverage. The signaling and call tests now reach 82.13% branch coverage.
+coverage. The signaling and call tests now reach 82.55% branch coverage.
 
 For end-to-end checks, install the server's dependencies too, then run:
 
@@ -85,14 +85,14 @@ already using these ports before running the checks. No physical camera
 or phone is needed. Failure screenshots are kept under the ignored
 `coverage\playwright` directory.
 
-For a production build, choose a folder outside this repository because
-`dist` still contains tracked older build files:
+Build the production browser files from source with:
 
 ```powershell
-npm run build -- --configuration production --output-path "$env:TEMP\webrtc-web-build"
+npm run build -- --configuration production
 ```
 
-With this output override, Angular places the browser files in the
-`browser` subfolder. Normal builds keep the old `dist\webTerra` asset path.
-The current build succeeds but warns that its initial bundle is 580.49 kB,
-above the existing 500 kB warning limit. The limit has not been raised.
+Angular writes to `dist\webTerra`. The build output and the old `src\app.zip`
+archive are not tracked by Git; the container builds its own fresh copy.
+The current build succeeds but warns that its initial bundle is about
+580 kB, above the existing 500 kB warning limit. The limit has not been
+raised.
