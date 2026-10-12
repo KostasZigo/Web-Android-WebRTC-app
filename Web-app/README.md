@@ -19,6 +19,16 @@ visiting by LAN address connects to port 8000 on that LAN address. HTTPS
 pages use `wss://` and require a secure WebSocket endpoint. Port 8000 is for
 WebSockets, not a web page.
 
+The production web container builds this app from source, serves it through
+Nginx, and proxies `/signaling/` to the server container. Its browser
+connects to `ws://<web host and port>/signaling/`, or `wss://` on an HTTPS page,
+so browser clients do not need a separate exposed signaling port. From
+the repository root, run
+`docker compose -f server\docker-compose.yml up --build -d` and open
+http://localhost:3000. Android still needs port 8000 on the host's LAN.
+See the root README for the deployment smoke test, TLS precautions, and
+the manual browser-to-phone checklist.
+
 For a server at another address, add a provider for the `SIGNALING_URL`
 token (from `./chat/service/data.service`) in `src\app\app.module.ts`:
 

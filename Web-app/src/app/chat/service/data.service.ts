@@ -1,12 +1,21 @@
-import { inject, Injectable, InjectionToken } from '@angular/core';
+import { inject, Injectable, InjectionToken, isDevMode } from '@angular/core';
 import { Subject, Subscription } from 'rxjs';
 import { webSocket, WebSocketSubject } from 'rxjs/webSocket';
 import { decodeMessage, IncomingMessage, OutgoingMessage } from '../types/message';
 
+export function defaultSignalingUrl(
+  page: Pick<Location, 'protocol' | 'host' | 'hostname'>,
+  production: boolean
+): string {
+  const protocol = page.protocol === 'https:' ? 'wss:' : 'ws:';
+  return production
+    ? `${protocol}//${page.host}/signaling/`
+    : `${protocol}//${page.hostname}:8000/`;
+}
+
 export const SIGNALING_URL = new InjectionToken<string>('SIGNALING_URL', {
   providedIn: 'root',
-  factory: () =>
-    `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.hostname}:8000/`
+  factory: () => defaultSignalingUrl(location, !isDevMode())
 });
 
 const reconnectDelayMs = 1000;

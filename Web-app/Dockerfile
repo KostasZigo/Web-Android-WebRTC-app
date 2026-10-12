@@ -1,7 +1,11 @@
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci --no-audit --no-fund
+COPY angular.json tsconfig*.json ./
+COPY src ./src
+RUN npm run build -- --configuration production
+
 FROM nginx:stable-alpine
-LABEL version="1.0"
-
 COPY nginx.conf /etc/nginx/nginx.conf
-
-WORKDIR /usr/share/nginx/html
-COPY dist/webTerra/ .
+COPY --from=build /app/dist/webTerra/ /usr/share/nginx/html/

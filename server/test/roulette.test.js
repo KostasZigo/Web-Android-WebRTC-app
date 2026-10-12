@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const { readFileSync } = require('node:fs');
+const { createRequire } = require('node:module');
 const path = require('node:path');
 const test = require('node:test');
 const { connectClient, startServer } = require('./websocket-test-helpers');
@@ -179,3 +180,45 @@ test('rejects binary messages while keeping the server available', async t => {
   assert.equal((await third.receive()).type, 'matched');
   assert.equal((await fourth.receive()).type, 'matched');
 });
+
+test('built deployment serves the browser and relays WebSockets on its own origin',
+  { skip: !process.env.DEPLOYMENT_URL }, async t => {
+    const origin = new URL(process.env.DEPLOYMENT_URL);
+    assert.match(origin.protocol, /^https?:$/);
+    const page = await fetch(origin);
+    assert.equal(page.status, 200);
+    const html = await page.text();
+    assert.match(html, /<app-root>/);
+    const script = html.match(/<script[^>]*src="([^"]*main[^"]*\.js)"/);
+    assert.ok(script, 'the built browser entry point must be served');
+    const bundle = await fetch(new URL(script[1], origin));
+    assert.equal(bundle.status, 200);
+    assert.match(await bundle.text(), /\/signaling\//);
+
+    const signaling = new URL('/signaling/', origin);
+    signaling.protocol = origin.protocol === 'https:' ? 'wss:' : 'ws:';
+    const first = await connectClient(t, signaling.href);
+    const second = await connectClient(t, signaling.href);
+    const [waiting, offering] = await Promise.all([first.receive(), second.receive()]);
+    assert.equal(waiting.offer, false);
+    assert.equal(offering.offer, true);
+    assert.equal(waiting.type, 'matched');
+    assert.equal(offering.type, 'matched');
+
+    second.send(fixture('browser-offer'));
+    assert.deepEqual(await first.receive(), fixture('browser-offer'));
+    first.send(fixture('android-answer'));
+    assert.deepEqual(await second.receive(), fixture('android-answer'));
+    await first.close();
+    await second.close();
+
+    const { chromium } = createRequire(path.join(__dirname, '..', '..', 'Web-app', 'package.json'))('playwright');
+    const browser = await chromium.launch({
+      args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream']
+    });
+    t.after(() => browser.close());
+    const pageInBrowser = await browser.newPage({ permissions: ['camera', 'microphone'] });
+    const opened = pageInBrowser.waitForEvent('websocket');
+    await pageInBrowser.goto(origin.href);
+    assert.equal((await opened).url(), signaling.href);
+  });

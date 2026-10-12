@@ -1,7 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { FakeWebSocket, replaceProperty } from '../../testing/browser-fakes';
 import { IncomingMessage, OutgoingMessage } from '../types/message';
-import { DataService, SIGNALING_URL } from './data.service';
+import { DataService, defaultSignalingUrl, SIGNALING_URL } from './data.service';
 
 describe('DataService', () => {
   let service: DataService;
@@ -66,6 +66,14 @@ describe('DataService', () => {
     const socket = await connect();
 
     expect(socket.url).toBe(`ws://${location.hostname}:8000/`);
+  });
+
+  it('uses the web origin for production signaling, including HTTPS and custom ports', () => {
+    const page = { protocol: 'http:', host: 'calls.example.test:3000', hostname: 'calls.example.test' };
+    expect(defaultSignalingUrl(page, true)).toBe('ws://calls.example.test:3000/signaling/');
+    expect(defaultSignalingUrl({ ...page, protocol: 'https:', host: 'calls.example.test:8443' }, true))
+      .toBe('wss://calls.example.test:8443/signaling/');
+    expect(defaultSignalingUrl(page, false)).toBe('ws://calls.example.test:8000/');
   });
 
   it('rejects a non-WebSocket URL instead of attempting to connect', () => {
