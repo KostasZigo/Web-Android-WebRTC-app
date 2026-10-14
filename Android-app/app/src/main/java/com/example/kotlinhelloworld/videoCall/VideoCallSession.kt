@@ -155,7 +155,7 @@ class VideoCallSession private constructor(
         config.continualGatheringPolicy = PeerConnection.ContinualGatheringPolicy.GATHER_CONTINUALLY
         config.sdpSemantics = PeerConnection.SdpSemantics.UNIFIED_PLAN
         val events = SimpleRTCEventHandler(
-            onIceCandidate = { candidate ->
+            onLocalIceCandidate = { candidate ->
                 dispatch { signaler.sendCandidate(candidate.sdpMLineIndex, candidate.sdpMid, candidate.sdp) }
             },
             onVideoTrack = { track -> dispatch { attachRemoteVideoTrack(track) } },
@@ -331,12 +331,12 @@ class VideoCallSession private constructor(
     }
 
     internal class SimpleRTCEventHandler(
-        private val onIceCandidate: (IceCandidate) -> Unit,
+        private val onLocalIceCandidate: (IceCandidate) -> Unit,
         private val onVideoTrack: (VideoTrack) -> Unit,
         private val onStatus: (VideoCallStatus) -> Unit
     ) : PeerConnection.Observer {
         override fun onIceCandidate(candidate: IceCandidate?) {
-            if (candidate != null) onIceCandidate(candidate)
+            if (candidate != null) onLocalIceCandidate(candidate)
         }
         override fun onTrack(transceiver: RtpTransceiver?) {
             (transceiver?.receiver?.track() as? VideoTrack)?.let(onVideoTrack)

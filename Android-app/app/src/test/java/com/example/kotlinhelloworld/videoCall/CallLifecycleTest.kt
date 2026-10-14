@@ -4,6 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import org.webrtc.IceCandidate
 import org.webrtc.PeerConnection
 
 class CallLifecycleTest {
@@ -88,6 +89,18 @@ class CallLifecycleTest {
                 VideoCallStatus.FAILED, VideoCallStatus.FINISHED),
             statuses
         )
+    }
+
+    @Test
+    fun `a local ICE candidate is forwarded once and null candidates are ignored`() {
+        val forwarded = mutableListOf<IceCandidate>()
+        val observer = VideoCallSession.SimpleRTCEventHandler(forwarded::add, {}, {})
+        val candidate = IceCandidate("video", 0, "candidate:1 1 UDP 1 127.0.0.1 12345 typ host")
+
+        observer.onIceCandidate(candidate)
+        observer.onIceCandidate(null)
+
+        assertEquals(listOf(candidate), forwarded)
     }
 
     @Test
