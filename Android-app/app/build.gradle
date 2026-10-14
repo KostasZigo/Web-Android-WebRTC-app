@@ -2,6 +2,11 @@ plugins {
     id 'com.android.application'
 }
 
+def debugSignalingUrl = providers.gradleProperty('debugSignalingUrl')
+    .orElse('ws://10.0.2.2:8000/')
+def releaseSignalingUrl = providers.gradleProperty('releaseSignalingUrl')
+    .orElse('REPLACE_WITH_PRODUCTION_WSS_URL')
+
 android {
     namespace = 'com.example.kotlinhelloworld'
     compileSdk = 37
@@ -15,7 +20,13 @@ android {
         testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
     }
     buildTypes {
+        debug {
+            buildConfigField 'String', 'SIGNALING_SERVER_URL',
+                groovy.json.JsonOutput.toJson(debugSignalingUrl.get())
+        }
         release {
+            buildConfigField 'String', 'SIGNALING_SERVER_URL',
+                groovy.json.JsonOutput.toJson(releaseSignalingUrl.get())
             minifyEnabled = false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
@@ -25,6 +36,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
+        buildConfig = true
         viewBinding = true
     }
     sourceSets {
@@ -51,4 +63,27 @@ dependencies {
     testImplementation 'org.json:json:20260814'
     androidTestImplementation 'androidx.test.ext:junit:1.3.0'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.7.0'
+}
+
+tasks.register('validateReleaseSignalingUrl') {
+    doLast {
+        def address = releaseSignalingUrl.get()
+        def uri
+        try {
+            uri = new java.net.URI(address)
+        } catch (java.net.URISyntaxException ignored) {
+            uri = null
+        }
+        if (uri?.scheme?.toLowerCase(java.util.Locale.ROOT) != 'wss' ||
+            !uri.host || uri.rawUserInfo || uri.rawQuery || uri.rawFragment ||
+            uri.port == 0 || uri.port > 65535) {
+            throw new GradleException(
+                'Set -PreleaseSignalingUrl=wss://your-domain.example/signaling/ before building a release'
+            )
+        }
+    }
+}
+
+tasks.matching { it.name == 'preReleaseBuild' }.configureEach {
+    dependsOn tasks.named('validateReleaseSignalingUrl')
 }

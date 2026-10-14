@@ -51,10 +51,30 @@ The development browser connects to `ws://<page hostname>:8000/`. The
 production browser connects through its own web origin at `/signaling/`,
 using `wss://` when the page uses HTTPS. To override either address, provide
 `SIGNALING_URL` as described in [`Web-app\README.md`](Web-app/README.md).
-For Android, change `BACKEND_URL` in `VideoCallActivity.kt` to
-`ws://<your computer's LAN IP>:8000/` and rebuild the app; `localhost` on
-a phone means the phone itself. The phone and server must be on the same
-reachable network.
+The Android app gets its signaling address from the **build**, not its
+users. Debug builds default to `ws://10.0.2.2:8000/`: from an Android
+emulator, `10.0.2.2` reaches the host's port 8000, exposed by Compose.
+For a physical phone, build with a developer-supplied address for the
+host on the same trusted LAN, for example from `Android-app`:
+
+```powershell
+.\gradlew.bat :app:assembleDebug '-PdebugSignalingUrl=ws://192.168.1.10:8000/'
+```
+
+The release address is initially `REPLACE_WITH_PRODUCTION_WSS_URL`; a
+release build fails until developers supply a real `wss://` Gateway/Ingress
+hostname, for example:
+
+```powershell
+.\gradlew.bat :app:assembleRelease '-PreleaseSignalingUrl=wss://calls.example.com/signaling/'
+```
+
+Both properties can also be supplied in a developer's untracked Gradle
+properties or by the release pipeline. An invalid development address
+shows a configuration error when starting a call. The hostname remains
+stable while Kubernetes Services route traffic to changing Pod IPs;
+neither Android users nor the app need to discover individual Pods.
+`localhost` on a phone means the phone itself.
 
 ## Run the production web and server images
 
@@ -109,12 +129,17 @@ cd Android-app
 .\gradlew.bat :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
 ```
 
-For a manual cross-device call: start the server and web app, set the
-Android `BACKEND_URL` to the host's LAN address, and connect the phone
-to that network. Connect Android **first** and grant camera and microphone
-access (and local-network access on Android 17+). Then open the page on
-the host at `localhost:3000`, allow browser camera/microphone access,
-and press **Start** and **Call**. Confirm local and remote
+With an emulator or Android device booted, run
+`.\gradlew.bat :app:connectedDebugAndroidTest` from `Android-app` to
+confirm that Connect opens a call without asking the user for an address.
+The UI test does not need a deployed server or a physical phone.
+
+For a manual cross-device call: start Compose, build Android with the
+host's LAN address as `debugSignalingUrl`, and connect the phone to that
+network. Connect Android **first** and grant camera and microphone access
+(and local-network access on Android 17+). Then open the page on the host
+at `localhost:3000`, allow browser camera/microphone access, and press
+**Start** and **Call**. Confirm local and remote
 video/audio on both devices, **Hangup**, and a second call without
 restarting either client. Try a third caller while a pair is active; it
 should see the busy notice. A real phone and a reachable LAN are needed

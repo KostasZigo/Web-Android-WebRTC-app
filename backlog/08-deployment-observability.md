@@ -3,11 +3,10 @@
 **Goal:** Operators can deploy and diagnose calls without hard-coded
 personal addresses or public unauthenticated signaling.
 
-**Scope:** Add a supported Android signaling-address setting in
-`VideoCallActivity.kt` instead of the current embedded LAN IP.
-Define a TLS front end for the web origin and its `/signaling/` WebSocket
-route; keep Android's signaling URL reachable and use `wss://` with a
-trusted certificate outside a trusted local development setup. Decide
+**Scope:** Configure the Android release build with the environment's
+stable `wss://` signaling hostname; the public app must not ask users
+for a server address. Define a TLS front end for the web origin and its
+`/signaling/` WebSocket route, using a trusted certificate. Decide
 how callers are authorized and rate-limited before exposing the single
 pair server publicly. Add internal health/readiness checks and minimal
 metrics for waiting, active, busy and failed connections.
@@ -20,8 +19,9 @@ deployment's approved secret-distribution design.
 
 **Done when:**
 - A staging browser loads over HTTPS and opens `wss://<same host>/signaling/`
-  through the proxy; Android can select that environment without editing
-  source or storing a password in the app.
+  through the proxy; an Android staging build reaches that hostname using
+  developer-supplied build configuration, without storing a password or
+  requiring users to enter a server address.
 - An unauthenticated or rate-limited caller cannot consume the only call
   slot. Health checks distinguish a running process from a ready
   signaling route without changing the existing WebSocket wire messages.

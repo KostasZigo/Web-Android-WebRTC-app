@@ -6,6 +6,7 @@
     <string name="status_matching">Waiting for another person…</string>
     <string name="status_failed">Call failed. Hang up and try again.</string>
     <string name="connect_btn">Connect</string>
+    <string name="server_configuration_error">This app build has no valid signaling server configured. Contact the app provider.</string>
     <string name="status_finished">Call ended</string>
     <string name="call_finished_message">The other person left the call. Return to Connect to start another call.</string>
     <string name="call_busy_message">Another pair is already in a call. Try again in a moment.</string>

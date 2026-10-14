@@ -24,6 +24,7 @@ class VideoCallActivity : AppCompatActivity() {
     private var savedMicrophoneState: Boolean? = null
     private var savedAudioMode: Int? = null
     private var exitNoticeShown = false
+    private var signalingAddress: String? = null
     private val localNetworkRequired: Boolean
         get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.CINNAMON_BUN
 
@@ -35,6 +36,13 @@ class VideoCallActivity : AppCompatActivity() {
             finish()
         }
 
+        signalingAddress = SignalingServerConfig.usableAddress(
+            BuildConfig.SIGNALING_SERVER_URL, BuildConfig.DEBUG
+        )
+        if (signalingAddress == null) {
+            showExitNotice(R.string.server_configuration_error)
+            return
+        }
         handlePermissions()
     }
 
@@ -95,6 +103,7 @@ class VideoCallActivity : AppCompatActivity() {
 
     private fun startVideoSession() {
         if (videoSession != null || isFinishing || isDestroyed) return
+        val address = signalingAddress ?: return showExitNotice(R.string.server_configuration_error)
         val manager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         audioManager = manager
         savedAudioMode = manager.mode
@@ -104,7 +113,7 @@ class VideoCallActivity : AppCompatActivity() {
 
         val session = VideoCallSession.create(
             this,
-            BACKEND_URL,
+            address,
             VideoRenderers(binding.pipVideo, binding.remoteVideo),
             this::onStatusChanged
         )
@@ -153,6 +162,5 @@ class VideoCallActivity : AppCompatActivity() {
     companion object {
         private const val CALL_PERMISSIONS_REQUEST = 1
         private const val TAG = "VideoCallActivity"
-        private const val BACKEND_URL = "ws://192.168.1.4:8000/"
     }
 }
