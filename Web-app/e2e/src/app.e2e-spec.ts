@@ -34,8 +34,11 @@ async function enterCall(page: Page) {
 }
 
 test('shows the call controls and pauses the local preview', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
   await page.goto('/');
+  await expect(page.getByRole('main')).toBeVisible();
   await expect(page.locator('mat-toolbar')).toContainText('Video Chat');
+  await expect(page.locator('video')).toHaveCount(2);
   for (const label of ['Start', 'Stop', 'Call', 'Hangup']) {
     await expect(page.getByRole('button', { name: label })).toBeVisible();
   }
