@@ -1,11 +1,14 @@
 <resources>
-    <string name="app_name">KotlinHelloWorld</string>
+    <string name="app_name">Video Chat</string>
     <string name="status_unknown">Waiting to connect</string>
     <string name="status_connecting">Connecting to the other person…</string>
     <string name="status_connected">Connected</string>
     <string name="status_matching">Waiting for another person…</string>
     <string name="status_failed">Call failed. Hang up and try again.</string>
     <string name="connect_btn">Connect</string>
+    <string name="call_welcome_title">Ready to connect?</string>
+    <string name="call_welcome_description">Meet someone over a video call.</string>
+    <string name="saitama_illustration">Saitama saying OK</string>
     <string name="server_configuration_error">This app build has no valid signaling server configured. Contact the app provider.</string>
     <string name="status_finished">Call ended</string>
     <string name="call_finished_message">The other person left the call. Return to Connect to start another call.</string>

@@ -1,4 +1,11 @@
 .app-shell {
-    min-height: 100%;
-    background: #fafafa;
+    min-height: 100vh;
+    background: #f2f5fa;
+}
+
+mat-toolbar.mat-primary {
+    background: #1e325a;
+    color: #fff;
+    letter-spacing: 0.02em;
+    padding-inline: clamp(16px, 4vw, 40px);
 }

@@ -1,19 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
+    <color name="purple_200">#FFD8E5F8</color>
+    <color name="purple_500">#FF1E325A</color>
+    <color name="purple_700">#FF121B2D</color>
     <color name="teal_200">#FF03DAC5</color>
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="callBackground">#121B2D</color>
+    <color name="callOverlay">#E61B2A42</color>
+    <color name="callSecondaryText">#C8D4E8</color>
+    <color name="callAction">#3165D4</color>
 
     <color name="colorPrimary">#3F51B5</color>
     <color name="colorPrimaryDark">#303F9F</color>
     <color name="colorAccent">#FF4081</color>
-    <color name="colorUnknown">#565656</color>
-    <color name="colorConnecting">#565656</color>
-    <color name="colorMatching">#4094CC</color>
-    <color name="colorFailed">#ED3437</color>
-    <color name="colorConnected">#40b633</color>
+    <color name="colorUnknown">#D8E3F2</color>
+    <color name="colorConnecting">#D8E3F2</color>
+    <color name="colorMatching">#8CCBFF</color>
+    <color name="colorFailed">#FF8995</color>
+    <color name="colorConnected">#7BE1AE</color>
 </resources>

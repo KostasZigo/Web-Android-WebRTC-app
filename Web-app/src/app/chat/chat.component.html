@@ -1,17 +1,23 @@
-<mat-grid-list cols="2">
-    <mat-grid-tile>
-        <p class="video-description">local:</p>
-        <video style="transform: scale(-1,1);" #local_video [autoplay]="true" [muted]="true"></video>
-    </mat-grid-tile>
-    <mat-grid-tile>
-        <p class="video-description">remote:</p>
-        <video #received_video [autoplay]="true"></video>
-    </mat-grid-tile>
-</mat-grid-list>
-@if (errorMessage) {
-    <p role="alert">{{ errorMessage }}</p>
-}
-<button mat-raised-button color="primary" (click)="startLocalVideo()">Start</button>
-<button mat-raised-button color="primary" (click)="pauseLocalVideo()">Stop</button>
-<button mat-raised-button color="primary" (click)="call()">Call</button>
-<button mat-raised-button color="primary" (click)="hangUp()">Hangup</button>
+<section class="call-card" aria-label="Video call">
+    <h1>Make a connection</h1>
+    <p class="call-intro">Preview your camera and connect when another caller joins.</p>
+    <mat-grid-list cols="2" gutterSize="12px">
+        <mat-grid-tile>
+            <p class="video-description">Your camera</p>
+            <video style="transform: scale(-1,1);" #local_video [autoplay]="true" [muted]="true" aria-label="Your camera"></video>
+        </mat-grid-tile>
+        <mat-grid-tile>
+            <p class="video-description">Other person</p>
+            <video #received_video [autoplay]="true" aria-label="Other person's camera"></video>
+        </mat-grid-tile>
+    </mat-grid-list>
+    @if (errorMessage) {
+        <p class="call-error" role="alert">{{ errorMessage }}</p>
+    }
+    <div class="call-controls">
+        <button mat-raised-button color="primary" (click)="startLocalVideo()">Start</button>
+        <button mat-raised-button color="primary" (click)="pauseLocalVideo()">Stop</button>
+        <button mat-raised-button color="primary" (click)="call()">Call</button>
+        <button mat-raised-button color="warn" (click)="hangUp()">Hangup</button>
+    </div>
+</section>

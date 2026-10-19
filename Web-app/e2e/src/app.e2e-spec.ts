@@ -38,10 +38,13 @@ test('shows the call controls and pauses the local preview', async ({ page }) =>
   await page.goto('/');
   await expect(page.getByRole('main')).toBeVisible();
   await expect(page.locator('mat-toolbar')).toContainText('Video Chat');
+  await expect(page.getByRole('heading', { name: 'Make a connection' })).toBeVisible();
+  await expect(page.locator('.video-description')).toHaveText(['Your camera', 'Other person']);
   await expect(page.locator('video')).toHaveCount(2);
   for (const label of ['Start', 'Stop', 'Call', 'Hangup']) {
     await expect(page.getByRole('button', { name: label })).toBeVisible();
   }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(320);
 
   await page.getByRole('button', { name: 'Start' }).click();
   const localVideo = page.locator('video').first();

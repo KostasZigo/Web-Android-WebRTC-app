@@ -1,14 +1,79 @@
+:host {
+    display: block;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: clamp(16px, 4vw, 40px);
+}
+
+.call-card {
+    padding: clamp(16px, 3vw, 32px);
+    border: 1px solid #dce4f0;
+    border-radius: 20px;
+    background: #fff;
+    box-shadow: 0 12px 36px #1e325a14;
+}
+
+h1 {
+    margin: 0;
+    color: #172943;
+    font-size: clamp(22px, 3vw, 30px);
+}
+
+.call-intro {
+    margin: 8px 0 24px;
+    color: #425575;
+    line-height: 1.5;
+}
+
+mat-grid-list {
+    display: block;
+}
+
+mat-grid-tile {
+    border-radius: 12px;
+    background: #121b2d;
+}
+
 video {
     width: 100%;
-    background: grey;
+    height: 100%;
+    object-fit: cover;
+    background: #121b2d;
 }
 
-p.video-description {
+.video-description {
     position: absolute;
-    top: 0px;
-    left: 10px;
+    z-index: 1;
+    top: 4px;
+    left: 12px;
+    padding: 6px 10px;
+    border-radius: 16px;
+    color: #fff;
+    background: #121b2de6;
+    font-size: 14px;
 }
 
-button {
-    margin: 1em;
+.call-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.call-controls button {
+    min-width: 104px;
+    min-height: 48px;
+    border-radius: 24px;
+}
+
+.call-controls button:focus-visible {
+    outline: 3px solid #3165d4;
+    outline-offset: 3px;
+}
+
+.call-error {
+    padding: 12px 16px;
+    border-radius: 8px;
+    color: #84243c;
+    background: #fff1f3;
 }
